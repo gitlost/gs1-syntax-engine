@@ -14,6 +14,7 @@ endif()
 set(gs1encoders_SRCS 
     ai.c
     dl.c
+    gs1encoders.c
     scandata.c
     syn.c
     syntax/gs1syntaxdictionary.c
@@ -62,8 +63,10 @@ set(gs1encoders_SRCS
 add_library(gs1encoders STATIC ${gs1encoders_SRCS})
 target_compile_definitions(gs1encoders PRIVATE GS1_LINTER_ERR_STR_EN)
 target_compile_definitions(gs1encoders PRIVATE EXCLUDE_SYNTAX_DICTIONARY_LOADER)
-if(WIN32)
-    target_compile_definitions(gs1encoders PRIVATE WIN32)
+
+if(MSVC)
     target_compile_definitions(gs1encoders PRIVATE _CRT_SECURE_NO_DEPRECATE)
     target_compile_definitions(gs1encoders PRIVATE _CRT_SECURE_NO_WARNINGS)
+
+    target_compile_options(gs1encoders PRIVATE -MD)
 endif()
