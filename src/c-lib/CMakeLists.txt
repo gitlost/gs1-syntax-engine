@@ -7,6 +7,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(gs1encoders)
 
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE Release)
+endif()
+
 set(gs1encoders_SRCS 
     ai.c
     dl.c
