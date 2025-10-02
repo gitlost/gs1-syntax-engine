@@ -1,4 +1,4 @@
-# Primitive cmake for MSVC, for static lib with EXCLUDE_SYNTAX_DICTIONARY_LOADER defined
+# Primitive cmake for MSVC, for static lib
 # Produces gs1-syntax-engine\src\c-lib\build\Release\gs1encoders.lib if invoked as e.g.
 #   cmake -A WIN32 -G "Visual Studio 17 2022" -B build
 #   cmake --build build --config Release
@@ -62,7 +62,6 @@ set(gs1encoders_SRCS
 
 add_library(gs1encoders STATIC ${gs1encoders_SRCS})
 target_compile_definitions(gs1encoders PRIVATE GS1_LINTER_ERR_STR_EN)
-target_compile_definitions(gs1encoders PRIVATE EXCLUDE_SYNTAX_DICTIONARY_LOADER)
 
 if(MSVC)
     target_compile_definitions(gs1encoders PRIVATE _CRT_SECURE_NO_DEPRECATE)

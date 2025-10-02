@@ -1,11 +1,11 @@
-# Primitive nmake file for MSVC 2015 upwards, for static lib with EXCLUDE_SYNTAX_DICTIONARY_LOADER defined
+# Primitive nmake file for MSVC 2015 upwards, for static lib
 # Produces gs1-syntax-engine\src\c-lib\gs1encoders.lib
 
 CC = cl
 LD = link
 AR = lib
 # Disable "warning C4028: formal parameter n different from declaration"
-CFLAGS  = /nologo /DGS1_LINTER_ERR_STR_EN /DEXCLUDE_SYNTAX_DICTIONARY_LOADER /D_CRT_SECURE_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS /MD /O2 /W3 /wd4028
+CFLAGS  = /nologo /DGS1_LINTER_ERR_STR_EN /D_CRT_SECURE_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS /MD /O2 /W3 /wd4028
 LDFLAGS = /nologo
 ARFLAGS = /nologo
 CP = copy
