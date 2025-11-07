@@ -17,6 +17,7 @@
 # limitations under the License.
 #
 
+.DEFAULT_GOAL := default
 
 VERSION := $(shell egrep -m1 '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$(dollar)' ../../CHANGES)
 
@@ -194,17 +195,9 @@ OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
 DEPS = $(addprefix $(BUILD_DIR)/, $(ALL_SRCS:.c=.d)) $(FUZZER_OBJS:.o=.d)
 
 
-.PHONY: all clean app app-static lib libshared libstatic install install-static install-shared uninstall test clean-test wasm clean-wasm fuzzer clean-fuzzer docs copyright setversion
-
-default: lib app-static
-all: lib app app-static
-lib: libshared libstatic
-libshared: $(LIB_SHARED)
-libstatic: $(LIB_STATIC)
-app: $(APP)
-app-static: $(APP_STATIC)
-
-
+#
+#  General goals
+#
 $(BUILD_DIR)/syntax/:
 	mkdir -p $@
 
@@ -238,6 +231,7 @@ $(BUILD_DIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_SO) $(LDLIBS) $^ -o $@
 
 endif
+
 
 #
 #  Static library
@@ -315,9 +309,32 @@ $(BUILD_DIR)/$(FUZZER_PREFIX)syn: $(OBJS) $(BUILD_DIR)/$(FUZZER_PREFIX)syn.o
 #
 #  Utility targets
 #
+.PHONY: default
+default: lib app-static
+
+.PHONY: all
+all: lib app app-static
+
+.PHONY: lib
+lib: libshared libstatic
+
+.PHONY: libshared
+libshared: $(LIB_SHARED)
+
+.PHONY: libstatic
+libstatic: $(LIB_STATIC)
+
+.PHONY: app
+app: $(APP)
+
+.PHONY: app-static
+app-static: $(APP_STATIC)
+
+.PHONY: .wasm
 wasm: $(WASM_JS)
 	@cp -f $(WASM_OUT_FILES) $(WASM_DIR)/
 
+.PHONY: test
 test: $(TEST_BIN)
 	$(SAN_ENV) ./$(TEST_BIN) $(TEST)
 
@@ -365,6 +382,7 @@ $(addprefix fuzzer-,$(FUZZER_NAMES)): fuzzer-%: $(BUILD_DIR)/$(FUZZER_PREFIX)% f
 	@echo '$(SAN_ENV)' $(BUILD_DIR)/$(FUZZER_PREFIX)$* -jobs=`$(NPROC)` -workers=`$(NPROC)` $(FUZZER_CORPUS_PREFIX)$*
 	@echo
 
+.PHONY: fuzzer
 fuzzer: $(FUZZER_BINS) | $(FUZZER_CORPUSES) fuzzer-corpus-seeds
 	@echo
 	@echo "Start fuzzing as follows:"
@@ -374,36 +392,46 @@ fuzzer: $(FUZZER_BINS) | $(FUZZER_CORPUSES) fuzzer-corpus-seeds
 	done
 	@echo
 
+.PHONY: clean
 clean:
 	$(RM) $(OBJS) $(APP_OBJ) $(APP) $(APP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
 
+.PHONY: clean-test
 clean-test:
 	$(RM) $(OBJS) $(APP_OBJ) $(APP) $(APP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
 
+.PHONY: clean-fuzzer
 clean-fuzzer:
 	$(RM) $(OBJS) $(APP_OBJ) $(APP) $(APP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
 
+.PHONY: clean-fuzzer-corpus
 clean-fuzzer-corpus:
 	$(RM) -r $(FUZZER_CORPUSES)
 
+.PHONY: clean-wasm
 clean-wasm:
 	$(RM) $(OBJS) $(WASM_JS) $(WASM_WASM) $(WASM_DIST_FILES) $(DEPS)
 
+.PHONY: install
 install: install-static install-shared
 
+.PHONY: .install-headers
 install-headers:
 	install -d $(DESTDIR)$(PREFIX)/include
 	install -m 0644 $(NAME).h $(DESTDIR)$(PREFIX)/include
 
+.PHONY: install-static
 install-static: libstatic install-headers
 	install -d $(DESTDIR)$(LIBDIR)
 	install -m 0644 $(BUILD_DIR)/lib$(NAME).$(LIB_STATIC_SUFFIX) $(DESTDIR)$(LIBDIR)
 
+.PHONY: install-shared
 install-shared: libshared install-headers
 	install -d $(DESTDIR)$(LIBDIR)
 	install -m 0644 $(BUILD_DIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)
 	-ldconfig
 
+.PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/include/$(NAME).h
 	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION)
@@ -412,23 +440,20 @@ uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_STATIC_SUFFIX)
 	-ldconfig
 
-docs:
-	doxygen
-	cp docstmp/gs1encoders_8h.html ../../docs/index.html
-	cp docstmp/gs1encoders_8h.html ../../docs
-	cp docstmp/doxygen.css ../../docs
-	cp docstmp/doxygen.svg ../../docs
-	cp docstmp/dynsections.js ../../docs
-	cp docstmp/jquery.js ../../docs
-	cp docstmp/menu.js ../../docs
-	cp docstmp/menudata.js ../../docs
-	cp docstmp/nav_f.png ../../docs
-	cp docstmp/nav_g.png ../../docs
-	cp docstmp/nav_h.png ../../docs
-	cp docstmp/tab_a.png ../../docs
-	cp docstmp/tab_b.png ../../docs
-	cp docstmp/tab_s.png ../../docs
-	cp docstmp/tabs.css ../../docs
+.PHONY: docs-clib
+docs-clib:
+	../../maintenance/docker/c-docs/docker-build.sh
+	cp ../../maintenance/docker/c-docs/build/index.html ../../docs/
+	cp ../../maintenance/docker/c-docs/build/gs1encoders_8h.html ../../docs/
+	cp ../../maintenance/docker/c-docs/build/structgs1__encoder__init__opts.html ../../docs/
+	cp ../../maintenance/docker/c-docs/build/input_output_buffers.svg ../../docs/
+	cp ../../maintenance/docker/c-docs/build/*.css ../../docs/
+	cp ../../maintenance/docker/c-docs/build/*.js ../../docs/
+	cp ../../maintenance/docker/c-docs/build/*.svg ../../docs/
+	cp ../../maintenance/docker/c-docs/build/*.png ../../docs/
+
+.PHONY: docs-demo
+docs-demo:
 	(cd ../.. && docker run --rm -v $$(pwd):/src -u $$(id -u):$$(id -g) emscripten/emsdk  make -C src/c-lib wasm JSONLY=yes)
 	mkdir -p ../../docs/demo
 	cp ../js-wasm/example.html ../../docs/demo
@@ -436,13 +461,38 @@ docs:
 	cp ../js-wasm/gs1encoder.mjs ../../docs/demo
 	cp ../js-wasm/gs1encoder-wasm.mjs ../../docs/demo
 
+.PHONY: docs-cs
+docs-cs:
+	../../maintenance/docker/cs-docs/docker-build.sh
+	cp ../../docs/cs/GS1.Encoders.html ../../docs/cs/index.html
+
+.PHONY: docs-java
+docs-java:
+	../../maintenance/docker/java-docs/docker-build.sh
+	cat ../../maintenance/docker/java-docs/custom.css >> ../../docs/java/stylesheet.css
+
+.PHONY: docs-swift
+docs-java:
+	../../maintenance/docker/swift-docs/docker-build.sh
+
+.PHONY: docs-js-wasm
+docs-js-wasm:
+	../../maintenance/docker/js-wasm-docs/docker-build.sh
+	cp ../../docs/js-wasm/module-gs1encoder.html ../../docs/js-wasm/index.html
+
+.PHONY: docs
+docs: docs-clib docs-cs docs-java docs-swift docs-js-wasm docs-demo
+
+.PHONY: copyright
 copyright:
 	git ls-files -z .. | xargs -0 -I{} sed -i --follow-symlinks -e "s/Copyright (c) \([[:digit:]]\{4\}\)\(-[[:digit:]]\{4\}\)\{0,1\} GS1 AISBL/Copyright (c) \1-$$(date +'%Y') GS1 AISBL/" {}
 
+.PHONY: setversion
 setversion:
 	(cd ../js-wasm && npm version --allow-same-version $(VERSION))
 	sed -i 's/name="Implementation-Version" value="[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+"/name="Implementation-Version" value="$(VERSION)"/' ../java/build.xml
 
+.PHONY: syncsyntaxdict
 syncsyntaxdict:
 	cp ../../../gs1-syntax-dictionary/gs1-syntax-dictionary.txt .
 	cp ../../../gs1-syntax-dictionary/src/acutest.h syntax/
