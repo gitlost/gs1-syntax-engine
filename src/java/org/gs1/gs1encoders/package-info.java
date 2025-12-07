@@ -35,7 +35,7 @@
  * formats.
  *
  * <p>
- * <img src="../../../../input_output_buffers.svg" alt="Data transformation: Inputs, outputs and buffers" style="max-width: 100%;">
+ * <img src="../../../input_output_buffers.svg" alt="Data transformation: Inputs, outputs and buffers" style="max-width: 1000px; width: 100%;">
  *
  * <p>
  * The above diagram highlights that conceptually the library contains two internal "data buffers":
@@ -317,7 +317,7 @@
  * //
  * // gs.setDataStr("^011231231231233310ABC123^99TEST");       // Unbracketed element string, "^" = FNC1
  * //
- * // gs.setDataStr("https://example.com/01/12312312312333/10/ABC123/99/TEST");   // GS1 Digital Link URI
+ * // gs.setDataStr("https://example.com/01/12312312312333/10/ABC123?99=TEST");   // GS1 Digital Link URI
  * //
  * // gs.setScanData("]Q1011231231231233310ABC123\u001D99TEST");   // Barcode scan data, containing a "GS" (ASCII 0x1D) separator
  *

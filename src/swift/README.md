@@ -17,7 +17,7 @@ The data formats supported by this library are:
 
 The following diagram shows how the library can be used for processing and transformation of GS1 data, indicating which formats are accepted as input, how barcode message data is generated and AI data extracted from the provided input data, and how the given data can be output in various formats.
 
-![Data transformation: Inputs, outputs and buffers](../input_output_buffers.svg)
+![Data transformation: Inputs, outputs and buffers](input_output_buffers.svg)
 
 The above diagram highlights that conceptually the library contains two internal "data buffers":
 
@@ -208,7 +208,7 @@ do {
 //
 // try gs.setDataStr("^011231231231233310ABC123^99TEST")       // Unbracketed element string, "^" = FNC1
 //
-// try gs.setDataStr("https://example.com/01/12312312312333/10/ABC123/99/TEST")   // GS1 Digital Link URI
+// try gs.setDataStr("https://example.com/01/12312312312333/10/ABC123?99=TEST")   // GS1 Digital Link URI
 //
 // try gs.setScanData("]Q1011231231231233310ABC123\u{001D}99TEST")   // Barcode scan data, containing a "GS" (ASCII 0x1D) separator
 
