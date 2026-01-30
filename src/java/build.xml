@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!--
-  Copyright (c) 2022-2025 GS1 AISBL.
+  Copyright (c) 2022-2026 GS1 AISBL.
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@
     <manifest>
         <attribute name="Implementation-Vendor" value="GS1 AISBL"/>
         <attribute name="Implementation-Title" value="GS1 Encoders Library"/>
-        <attribute name="Implementation-Version" value="1.1.0"/>
+        <attribute name="Implementation-Version" value="1.3.0"/>
       </manifest>
     </jar>
   </target>
