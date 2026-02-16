@@ -22,7 +22,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "syntax/gs1syntaxdictionary.h"
@@ -231,7 +230,7 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 	int length, aizeros;
 	char* ret;
 	size_t outStr_len = 0;
-	char* primary_data_out;
+	const char* primary_data_out;
 
 	assert(ctx);
 

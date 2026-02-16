@@ -140,8 +140,10 @@ export class GS1encoder {
      * @returns {void}
      */
     free() {
-        this.api.gs1_encoder_free(this.ctx);
-        this.ctx = null;
+        if (this.ctx !== null) {
+            this.api.gs1_encoder_free(this.ctx);
+            this.ctx = null;
+        }
     }
 
 
@@ -350,11 +352,10 @@ export class GS1encoder {
      * @throws {@link GS1encoderParameterException}
      */
     get validateAIassociations() {
-        return this.api.gs1_encoder_getValidateAIassociations(this.ctx) != 0;
+        return this.getValidationEnabled(GS1encoder.validation.RequisiteAIs);
     }
     set validateAIassociations(value) {
-        if (!this.api.gs1_encoder_setValidateAIassociations(this.ctx, value ? 1 : 0))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        this.setValidationEnabled(GS1encoder.validation.RequisiteAIs, value);
     }
 
 

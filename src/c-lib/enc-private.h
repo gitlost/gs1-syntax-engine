@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "gs1encoders.h"
 
@@ -39,9 +40,10 @@
 #define ssize_t ptrdiff_t
 #define alloca _alloca
 #else
+#  include <sys/types.h>				// IWYU pragma: export
 #  if (defined(__GNUC__) && !defined(alloca) && !defined(__NetBSD__)) || defined(__NuttX__) || defined(_AIX) \
         || (defined(__sun) && defined(__SVR4) /*Solaris*/)
-#    include <alloca.h>
+#    include <alloca.h>				// IWYU pragma: export
 #  endif
 #endif
 
@@ -248,6 +250,34 @@ struct gs1_encoder {
 
 
 /*
+ *  Inline helpers
+ *
+ */
+// Append up to the remaining length of the destination
+static inline char* gs1_buf_append(char *dst, size_t *rem, const void *src, size_t len) {
+	if (len == 0 || len > SIZE_MAX / 2)	// Prevent underflow of src
+		return dst;
+	if (*rem > 1) {
+		if (len > *rem - 1)
+			len = *rem - 1;
+		memcpy(dst, src, len);
+		dst += len;
+		*rem -= len;
+	}
+	return dst;
+}
+
+// Buffer is all digits
+static inline __ATTR_PURE bool gs1_allDigits(const uint8_t* const str, size_t len) {
+	size_t i;
+	for (i = 0; i < len; i++)
+		if (unlikely(str[i] < '0' || str[i] > '9'))
+			return false;
+	return true;
+}
+
+
+/*
  *  Utility functions
  *
  */
@@ -259,8 +289,6 @@ typedef struct {
 } gs1_tok_t;
 
 bool gs1_tokenise(const char *data, char delim, gs1_tok_t *tok);
-
-bool gs1_allDigits(const uint8_t *str, size_t len);
 
 char* gs1_strdup_alloc(const char *s);
 

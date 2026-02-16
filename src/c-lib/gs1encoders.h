@@ -638,8 +638,8 @@ GS1_ENCODERS_API bool gs1_encoder_getValidationEnabled(gs1_encoder *ctx, gs1_enc
  * satisfy checks when the provided AI data represents only part if the overall
  * AI data on a label.
  *
- * Nevertheless, the full AI data should be validated by concatinating it and
- * verifying it with this library with all relivant AI validation procedures
+ * Nevertheless, the full AI data should be validated by concatenating it and
+ * verifying it with this library with all relevant AI validation procedures
  * enabled.
  *
  * @see gs1_encoder_getValidationEnabled()
@@ -1002,7 +1002,7 @@ GS1_ENCODERS_API bool gs1_encoder_setScanData(gs1_encoder* ctx, const char *scan
  * @see gs1_encoder_setAIdataStr()
  *
  * @param [in,out] ctx ::gs1_encoder context
- * @return a pointer to a string representing the scan data for the input data contained within symbols of the selected symbology
+ * @return a pointer to a string representing the scan data for the input data contained within symbols of the selected symbology, or NULL if no symbology is selected
  */
 GS1_ENCODERS_API char* gs1_encoder_getScanData(gs1_encoder* ctx);
 

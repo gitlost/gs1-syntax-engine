@@ -173,6 +173,7 @@ fail:
 	}
 #endif
 
+	// cppcheck-suppress duplicateCondition
 	if (!quiet)
 		printf("*** Unable to continue. STOPPING.\n");
 	return false;
@@ -566,27 +567,16 @@ static size_t validate_ai_val(gs1_encoder* const ctx, const char* const ai, cons
 				ctx->linterErr = err;
 				errpos += (size_t)(p-start);
 
-#define ERR_CAT(src, len) do {			\
-	size_t n = (len);			\
-	if (n == 0 || n > SIZE_MAX/2) break;	\
-	if (n > rem - 1) n = rem - 1;		\
-	memcpy(m, (src), n);			\
-	m += n;					\
-	rem -= n;				\
-} while(0)
-
 				// "(AI)before|error|after"
-				ERR_CAT("(", 1);
-				ERR_CAT(ai, entry->ailen);
-				ERR_CAT(")", 1);
-				ERR_CAT(start, errpos);
-				ERR_CAT("|", 1);
-				ERR_CAT(start + errpos, errlen);
-				ERR_CAT("|", 1);
-				ERR_CAT(start + errpos + errlen, complen - errpos - errlen);
+				m = gs1_buf_append(m, &rem, "(", 1);
+				m = gs1_buf_append(m, &rem, ai, entry->ailen);
+				m = gs1_buf_append(m, &rem, ")", 1);
+				m = gs1_buf_append(m, &rem, start, errpos);
+				m = gs1_buf_append(m, &rem, "|", 1);
+				m = gs1_buf_append(m, &rem, start + errpos, errlen);
+				m = gs1_buf_append(m, &rem, "|", 1);
+				m = gs1_buf_append(m, &rem, start + errpos + errlen, complen - errpos - errlen);
 				*m = '\0';
-
-#undef ERR_CAT
 
 				return 0;
 			}
@@ -1143,14 +1133,14 @@ static void do_test_existsInAIdata(gs1_encoder* const ctx, const char* const fil
 	char casename[256];
 	const struct aiValue* match = NULL;
 
-	snprintf(casename, sizeof(casename), "%s:%d: %s | +(%s) | -(%s)", file, line, dataStr, needle, ignore);
+	snprintf(casename, sizeof(casename), "%s:%d: %s | +(%s) | -(%s)", file, line, dataStr, needle, ignore ? ignore : "");
 	TEST_CASE(casename);
 
 	ctx->numAIs = 0;
 	ctx->numSortedAIs = 0;
 	TEST_ASSERT(gs1_encoder_setAIdataStr(ctx, dataStr));
 
-	TEST_CHECK(existsInAIdata(ctx, needle, strlen(needle), ignore, (expect != NULL ? &match : NULL)) ^ !should_succeed);
+	TEST_CHECK((existsInAIdata(ctx, needle, strlen(needle), ignore, (expect != NULL ? &match : NULL))) ^ (!should_succeed));
 
 	if (expect != NULL) {
 		TEST_ASSERT(match != NULL);
