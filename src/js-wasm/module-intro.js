@@ -80,13 +80,17 @@
  * <pre>
  * import { GS1encoder } from "gs1encoder";
  *
- * const gs = new GS1encoder();
- * await gs.init();
+ * const gs = await GS1encoder.create();
  *
- * console.log("Version:", gs.version);
+ * gs.aiDataStr = "(01)09521234543213(99)TESTING123";
+ * console.log("GS1 Digital Link URI: " + gs.getDLuri("https://example.com"));
  *
- * gs.free();
+ * gs.free();  // Release native resources when done
  * </pre>
+ *
+ * <strong>Note:</strong> Each GS1encoder instance allocates native resources. Call
+ * {@link GS1encoder#free free()} when you are finished with an instance to
+ * release these resources promptly.
  *
  * You can then run the example with:
  *
@@ -118,8 +122,7 @@
  *     &lt;script type="module"&gt;
  *         import { GS1encoder } from './node_modules/gs1encoder/gs1encoder.mjs';
  *
- *         const gs = new GS1encoder();
- *         await gs.init();
+ *         const gs = await GS1encoder.create();
  *
  *         document.getElementById('output').textContent = 'Version: ' + gs.version;
  *
@@ -157,7 +160,7 @@
  *
  * <p>
  * Using the library always begins by creating a new GS1encoder instance
- * and calling {@link GS1encoder#init}.
+ * using the {@link GS1encoder.create} factory method.
  *
  * <p>
  * Unless otherwise specified, the getter methods return library-managed
@@ -178,8 +181,7 @@
  * failures) and displays the extracted AIs if the validation succeeds.
  *
  * <pre>
- * const gs = new GS1encoder();                             // Create a new instance of the library
- * await gs.init();
+ * const gs = await GS1encoder.create();                     // Create a new instance of the library
  *
  * // gs.permitUnknownAIs = true;                           // Uncomment only if it is necessary to handle AIs
  *                                                          // that are not known to the library
@@ -217,8 +219,7 @@
  * barcode message data, suitable for carrying in a GS1 barcode symbol.
  *
  * <pre>
- * const gs = new GS1encoder();
- * await gs.init();
+ * const gs = await GS1encoder.create();
  *
  * try {
  *     gs.aiDataStr = "(01)12312312312333(10)ABC123(99)TEST";    // Accept a bracketed AI element string
@@ -265,8 +266,7 @@
  * data.
  *
  * <pre>
- * const gs = new GS1encoder();
- * await gs.init();
+ * const gs = await GS1encoder.create();
  *
  * // Disable validation of mandatory association between AIs if the symbol may
  * // be one of multiple on a label

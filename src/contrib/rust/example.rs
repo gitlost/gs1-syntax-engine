@@ -25,7 +25,7 @@
 use gs1encoders::{GS1Encoder, Symbology, Validation};
 
 fn main() {
-    let gs1encoder = GS1Encoder::new().unwrap_or_else(|error| panic!("{}", error));
+    let mut gs1encoder = GS1Encoder::new().unwrap_or_else(|error| panic!("{}", error));
 
     println!("\nVersion: {}\n", gs1encoder.get_version());
 
@@ -78,8 +78,8 @@ fn main() {
 
     // DL URI
     match gs1encoder.get_dl_uri(Some("https://example.com")) {
-        Some(uri) => println!("\nDL URI: {}", uri),
-        Option::None => println!("\nDL URI: Failed: {}", gs1encoder.get_err_markup()),
+        Ok(uri) => println!("\nDL URI: {}", uri),
+        Err(e) => println!("\nDL URI: Failed: {}", e),
     }
 
     // Scan data round-trip

@@ -67,6 +67,7 @@ To use the wrapper in your C# project you must:
 
 1. Include the wrapper source within your project
 2. Ensure `gs1encoders.dll` (the native library) is in the same directory as your executable or in a location on your system PATH
+3. Ensure the [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) is installed on the target system, with the architecture (x86 or x64) matching the native library build
 
 For a minimal example, create a console application as follows:
 
@@ -102,9 +103,20 @@ Edit `Program.cs` to contain:
 using System;
 using GS1.Encoders;
 
-GS1Encoder gs = new GS1Encoder();
-Console.WriteLine("GS1 Syntax Engine version: " + gs.Version);
+using (GS1Encoder gs = new GS1Encoder())
+{
+    gs.AIdataStr = "(01)09521234543213(99)TESTING123";
+    Console.WriteLine("GS1 Digital Link URI: " + gs.GetDLuri("https://example.com"));
+}
 ```
+
+**Note:** Each `GS1Encoder` instance allocates native resources. `GS1Encoder`
+implements `IDisposable`, so use a `using` block (as above) to ensure these
+resources are released promptly. Alternatively, call `Dispose()` or `Free()`
+explicitly when done.
+
+**Note:** The library is thread-safe provided that each thread operates on its
+own `GS1Encoder` instance. Do not share a single instance across threads.
 
 Run your application:
 

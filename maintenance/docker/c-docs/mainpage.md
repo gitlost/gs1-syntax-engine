@@ -92,6 +92,11 @@ To use the library in your C/C++ project you must:
   1. Include `gs1encoders.h` in your source files
   2. Link against the library (`libgs1encoders.so`, `libgs1encoders.a`, `gs1encoders.dll`, or `gs1encoders.lib`)
 
+**Note:** On Windows, `gs1encoders.dll` requires the
+[Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+to be installed on the target system. The architecture (x86 or x64) must match
+the platform used to build the library.
+
 For a minimal example, create a `myapp.c` file as follows:
 
 \code
@@ -102,12 +107,22 @@ int main(void) {
     gs1_encoder *gs = gs1_encoder_init(NULL);
     if (!gs) return 1;
 
-    printf("GS1 Syntax Engine version: %s\n", gs1_encoder_getVersion());
+    if (!gs1_encoder_setAIdataStr(gs, "(01)09521234543213(99)TESTING123")) {
+        printf("Error: %s\n", gs1_encoder_getErrMsg(gs));
+        gs1_encoder_free(gs);
+        return 1;
+    }
+
+    printf("GS1 Digital Link URI: %s\n", gs1_encoder_getDLuri(gs, "https://example.com"));
 
     gs1_encoder_free(gs);
     return 0;
 }
 \endcode
+
+**Note:** Each `gs1_encoder` instance allocates native resources. Always call
+gs1_encoder_free() when you are finished with an instance to release these
+resources.
 
 **On Unix/macOS:**
 

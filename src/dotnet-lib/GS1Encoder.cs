@@ -25,7 +25,7 @@ namespace GS1.Encoders
     /// <summary>
     /// Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.
     /// </summary>
-    public class GS1Encoder
+    public class GS1Encoder : IDisposable
     {
 
         /// <summary>
@@ -38,52 +38,52 @@ namespace GS1.Encoders
             NONE = -1,
 
             /// <summary>GS1 DataBar Omnidirectional</summary>
-            DataBarOmni,
+            DataBarOmni = 0,
 
             /// <summary>GS1 DataBar Truncated</summary>
-            DataBarTruncated,
+            DataBarTruncated = 1,
 
             /// <summary>GS1 DataBar Stacked</summary>
-            DataBarStacked,
+            DataBarStacked = 2,
 
             /// <summary>GS1 DataBar Stacked Omnidirectional</summary>
-            DataBarStackedOmni,
+            DataBarStackedOmni = 3,
 
             /// <summary>GS1 DataBar Limited</summary>
-            DataBarLimited,
+            DataBarLimited = 4,
 
             /// <summary>GS1 DataBar Expanded (Stacked)</summary>
-            DataBarExpanded,
+            DataBarExpanded = 5,
 
             /// <summary>UPC-A</summary>
-            UPCA,
+            UPCA = 6,
 
             /// <summary>UPC-E</summary>
-            UPCE,
+            UPCE = 7,
 
             /// <summary>EAN-13</summary>
-            EAN13,
+            EAN13 = 8,
 
             /// <summary>EAN-8</summary>
-            EAN8,
+            EAN8 = 9,
 
             /// <summary>GS1-128 with CC-A or CC-B</summary>
-            GS1_128_CCA,
+            GS1_128_CCA = 10,
 
             /// <summary>GS1-128 with CC</summary>
-            GS1_128_CCC,
+            GS1_128_CCC = 11,
 
             /// <summary>(GS1) QR Code</summary>
-            QR,
+            QR = 12,
 
             /// <summary>(GS1) Data Matrix</summary>
-            DM,
+            DM = 13,
 
             /// <summary>(GS1) DotCode</summary>
-            DotCode,
+            DotCode = 14,
 
             /// <summary>Value is the number of symbologies</summary>
-            NUMSYMS,
+            NUMSYMS = 15,
 
         };
 
@@ -106,19 +106,19 @@ namespace GS1.Encoders
             MutexAIs = 0,
 
             /// <summary>Mandatory associations between AIs</summary>
-            RequisiteAIs,
+            RequisiteAIs = 1,
 
             /// <summary>Repeated AIs having same value (locked: always enabled)</summary>
-            RepeatedAIs,
+            RepeatedAIs = 2,
 
             /// <summary>Serialisation qualifier AIs must be present with Digital Signature (locked: always enabled)</summary>
-            DigSigSerialKey,
+            DigSigSerialKey = 3,
 
             /// <summary>Unknown AIs not permitted as GS1 DL URI data attributes</summary>
-            UnknownAInotDLattr,
+            UnknownAInotDLattr = 4,
 
             /// <summary>Value is the number of validations</summary>
-            NUMVALIDATIONS,
+            NUMVALIDATIONS = 5,
 
         };
 
@@ -132,7 +132,7 @@ namespace GS1.Encoders
         /// "instance" of the library. It is hidden behind the object
         /// interface that is provided to users of this wrapper.
         /// </summary>
-        private readonly IntPtr ctx;
+        private IntPtr ctx;
 
         /*
          *  Functions imported from the native GS1 Barcode Syntax Engine dynamic-link library
@@ -171,7 +171,7 @@ namespace GS1.Encoders
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setIncludeDataTitlesInHRI", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setIncludeDataTitlesInHRI(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool addCheckDigit);
+        private static extern bool gs1_encoder_setIncludeDataTitlesInHRI(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool includeDataTitlesInHRI);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getPermitUnknownAIs", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
@@ -196,14 +196,6 @@ namespace GS1.Encoders
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setValidationEnabled", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
         private static extern bool gs1_encoder_setValidationEnabled(IntPtr ctx, int validation, [MarshalAs(UnmanagedType.U1)] bool enabled);
-
-        [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getValidateAIassociations", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_getValidateAIassociations(IntPtr ctx);
-
-        [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setValidateAIassociations", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setValidateAIassociations(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool validateAIasssociations);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getDataStr", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr gs1_encoder_getDataStr(IntPtr ctx);
@@ -234,13 +226,6 @@ namespace GS1.Encoders
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getDLignoredQueryParams", CallingConvention = CallingConvention.Cdecl)]
         private static extern int gs1_encoder_getDLignoredQueryParams(IntPtr ctx, ref IntPtr qp);
-
-        [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getDataFile", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getDataFile(IntPtr ctx);
-
-        [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setDataFile", CallingConvention = CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setDataFile(IntPtr ctx, string dataFile);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_free", CallingConvention = CallingConvention.Cdecl)]
         private static extern void gs1_encoder_free(IntPtr ctx);
@@ -644,7 +629,7 @@ namespace GS1.Encoders
         /// Process scan data received from a barcode reader or return the expected scan data string.
         /// </summary>
         /// <value>
-        /// The scan data string that a reader should return when scanning the current data, or <c>null</c> if invalid.
+        /// The scan data string that a reader should return when scanning the current data, or <c>null</c> if no symbology is set.
         /// </value>
         /// <remarks>
         /// <para>
@@ -725,7 +710,7 @@ namespace GS1.Encoders
         /// <summary>
         /// Get a GS1 Digital Link URI that represents the AI-based input data.
         /// </summary>
-        /// <param name="Stem">A URI "stem" used as a prefix for the URI. If <c>null</c>, the GS1 canonical stem (https://id.gs1.org/) will be used.</param>
+        /// <param name="stem">A URI "stem" used as a prefix for the URI. If <c>null</c>, the GS1 canonical stem (https://id.gs1.org/) will be used.</param>
         /// <returns>A string representing the GS1 Digital Link URI for the input data</returns>
         /// <exception cref="GS1EncoderDigitalLinkException">Thrown when invalid input was provided</exception>
         /// <remarks>
@@ -738,9 +723,9 @@ namespace GS1.Encoders
         /// <c>https://id.example.com/stem/01/12345678901231?10=ABC123&amp;11=210630</c>
         /// </para>
         /// </remarks>
-        public string GetDLuri(string Stem)
+        public string GetDLuri(string stem)
         {
-            string uri = Marshal.PtrToStringAnsi(gs1_encoder_getDLuri(ctx, Stem));
+            string uri = Marshal.PtrToStringAnsi(gs1_encoder_getDLuri(ctx, stem));
             if (uri == null)
                 throw new GS1EncoderDigitalLinkException(ErrMsg);
             return uri;
@@ -821,10 +806,32 @@ namespace GS1.Encoders
             }
         }
 
+        /// <summary>
+        /// Releases the resources used by this GS1Encoder instance.
+        /// </summary>
+        /// <param name="disposing">True if called from Dispose; false if called from the finalizer.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (ctx != IntPtr.Zero)
+            {
+                gs1_encoder_free(ctx);
+                ctx = IntPtr.Zero;
+            }
+        }
+
+        /// <summary>
+        /// Releases the resources used by this GS1Encoder instance.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         /// <exclude />
         ~GS1Encoder()
         {
-            gs1_encoder_free(ctx);
+            Dispose(false);
         }
 
     }
@@ -860,24 +867,6 @@ namespace GS1.Encoders
         /// Description of the error.
         /// </param>
         public GS1EncoderParameterException(string message)
-           : base(message)
-        {
-        }
-    }
-
-    /// <summary>
-    /// A custom exception class that is thrown to indicate a problem generating
-    /// a barcode symbol.
-    /// </summary>
-    public class GS1EncoderEncodeException : Exception
-    {
-        /// <summary>
-        /// Error constructor.
-        /// </summary>
-        /// <param name="message">
-        /// Description of the error.
-        /// </param>
-        public GS1EncoderEncodeException(string message)
            : base(message)
         {
         }

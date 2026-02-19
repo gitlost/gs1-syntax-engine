@@ -103,12 +103,20 @@ import GS1Encoders
 
 do {
     let gs = try GS1Encoder()
-    print("GS1 Syntax Engine version: \(gs.getVersion())")
-    gs.free()
+    try gs.setAIdataStr("(01)09521234543213(99)TESTING123")
+    let uri = try gs.getDLuri("https://example.com")
+    print("GS1 Digital Link URI: \(uri)")
 } catch {
     print("Error: \(error)")
 }
 ```
+
+**Note:** Each `GS1Encoder` instance allocates native resources that are automatically
+released when the instance is deallocated (`deinit`). You can also call `free()`
+explicitly if you need to release resources before the instance goes out of scope.
+
+**Note:** The library is thread-safe provided that each thread operates on its
+own `GS1Encoder` instance. Do not share a single instance across threads.
 
 Build and run:
 
@@ -116,7 +124,7 @@ Build and run:
 swift run
 ```
 
-For a comprehensive example, see [Example.swift](https://github.com/gs1/gs1-syntax-engine/blob/main/src/swift/Example.swift).
+For a comprehensive example, see [Example.swift](https://github.com/gs1/gs1-syntax-engine/blob/main/src/swift/Sources/Example/Example.swift).
 
 ### iOS Mobile App Quick Start
 

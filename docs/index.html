@@ -98,6 +98,7 @@ Using in your own C/C++ project</h3>
 <li>Include <code><a class="el" href="gs1encoders_8h.html">gs1encoders.h</a></code> in your source files</li>
 <li>Link against the library (<code>libgs1encoders.so</code>, <code>libgs1encoders.a</code>, <code>gs1encoders.dll</code>, or <code>gs1encoders.lib</code>)</li>
 </ol>
+<p><b>Note:</b> On Windows, <code>gs1encoders.dll</code> requires the <a href="https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist">Microsoft Visual C++ Redistributable</a> to be installed on the target system. The architecture (x86 or x64) must match the platform used to build the library.</p>
 <p>For a minimal example, create a <code>myapp.c</code> file as follows:</p>
 <div class="fragment"><div class="line">#include &lt;stdio.h&gt;</div>
 <div class="line">#include &quot;gs1encoders.h&quot;</div>
@@ -106,12 +107,19 @@ Using in your own C/C++ project</h3>
 <div class="line">    gs1_encoder *gs = gs1_encoder_init(NULL);</div>
 <div class="line">    if (!gs) return 1;</div>
 <div class="line"> </div>
-<div class="line">    printf(&quot;GS1 Syntax Engine version: %s\n&quot;, gs1_encoder_getVersion());</div>
+<div class="line">    if (!gs1_encoder_setAIdataStr(gs, &quot;(01)09521234543213(99)TESTING123&quot;)) {</div>
+<div class="line">        printf(&quot;Error: %s\n&quot;, gs1_encoder_getErrMsg(gs));</div>
+<div class="line">        gs1_encoder_free(gs);</div>
+<div class="line">        return 1;</div>
+<div class="line">    }</div>
+<div class="line"> </div>
+<div class="line">    printf(&quot;GS1 Digital Link URI: %s\n&quot;, gs1_encoder_getDLuri(gs, &quot;https://example.com&quot;));</div>
 <div class="line"> </div>
 <div class="line">    gs1_encoder_free(gs);</div>
 <div class="line">    return 0;</div>
 <div class="line">}</div>
-</div><!-- fragment --><p><b>On Unix/macOS:</b></p>
+</div><!-- fragment --><p><b>Note:</b> Each <code>gs1_encoder</code> instance allocates native resources. Always call <a class="el" href="gs1encoders_8h.html#a0078a51318ba3551052c309fe48110ae" title="Destroy a gs1_encoder instance.">gs1_encoder_free()</a> when you are finished with an instance to release these resources.</p>
+<p><b>On Unix/macOS:</b></p>
 <p>Compile and link: </p><pre class="fragment">gcc myapp.c -I&lt;path-to-gs1-syntax-engine&gt;/src/c-lib -L&lt;path-to-gs1-syntax-engine&gt;/src/c-lib/build -lgs1encoders -o myapp
 </pre><p> Run: </p><pre class="fragment">LD_LIBRARY_PATH=&lt;path-to-gs1-syntax-engine&gt;/src/c-lib/build ./myapp
 </pre><p> <b>On Windows:</b></p>

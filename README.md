@@ -48,7 +48,7 @@ There is a large corpus of example code.
 
 **Swift:**
 
-- Console application ([source](src/swift/Example.swift))
+- Console application ([source](src/swift/Sources/Example/Example.swift))
 - iOS mobile app with ML Kit barcode scanning ([source](src/ios))
 
 **JavaScript/Wasm:**
@@ -71,6 +71,10 @@ without needing to build from source. All demos can be
 | Browser app     | `gs1encoders-wasm-app.zip`            | Serve `example.{html+mjs}`, `gs1encoder.mjs`, `gs1encoder-wasm.{mjs+wasm}`; `.wasm` must have MIME type: `application/wasm` |
 | Node.js console | `gs1encoders-wasm-app.zip`            | Run `node example.node.mjs`                                                                                                 |
 | -               | `gs1encoders-jsonly-app.zip`          | Pure JavaScript (asm.js) alternative to Wasm build; No `.wasm` file                                                         |
+
+**Note:** The Windows pre-built applications require the [Microsoft Visual C++
+Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+to be installed on the target system.
 
 ## Pre-built Library Assets
 

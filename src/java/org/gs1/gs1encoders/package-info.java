@@ -81,7 +81,7 @@
  * <ol>
  * <li>First, build the C library using Visual Studio or from a Developer Command Prompt:
  * <pre>
- * msbuild src\gs1encoders.sln /t:gs1encoders /p:Configuration=Debug /p:Platform=x64
+ * msbuild src\gs1encoders.sln /t:gs1encoders /p:Configuration=Release /p:Platform=x64
  * </pre>
  * </li>
  * <li>Then build the Java wrapper:
@@ -120,6 +120,7 @@
  * <ol>
  * <li>Add {@code libgs1encoders.jar} to your project's classpath at compile time and runtime
  * <li>Ensure the directory containing the native library ({@code libgs1encodersjni.so}) and the symlink ({@code libgs1encoders.so}) are in {@code java.library.path} at runtime
+ * <li>On Windows, ensure the <a href="https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist">Microsoft Visual C++ Redistributable</a> is installed on the target system, with the architecture (x86 or x64) matching the native library build
  * </ol>
  *
  * For a minimal example a {@code MyApp.java} file as follows:
@@ -134,16 +135,24 @@
  *     }
  *
  *     public static void main(String[] args) {
- *         try {
- *             GS1Encoder gs = new GS1Encoder();
- *             System.out.println("GS1 Syntax Engine version: " + gs.getVersion());
- *             gs.free();
+ *         try (GS1Encoder gs = new GS1Encoder()) {
+ *             gs.setAIdataStr("(01)09521234543213(99)TESTING123");
+ *             System.out.println("GS1 Digital Link URI: " + gs.getDLuri("https://example.com"));
  *         } catch (Exception e) {
  *             System.err.println("Error: " + e.getMessage());
  *         }
  *     }
  * }
  * </pre>
+ *
+ * <strong>Note:</strong> Each {@link GS1Encoder} instance allocates native resources.
+ * {@link GS1Encoder} implements {@link AutoCloseable}, so use try-with-resources
+ * (as above) to ensure these resources are released promptly. Alternatively, call
+ * {@link GS1Encoder#free() free()} explicitly when done.
+ *
+ * <strong>Note:</strong> The library is thread-safe provided that each thread
+ * operates on its own {@link GS1Encoder} instance. Do not share a single
+ * instance across threads.
  *
  * <strong>On Unix/macOS:</strong>
  *

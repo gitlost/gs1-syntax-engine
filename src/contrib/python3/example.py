@@ -21,7 +21,12 @@
 #  limitations under the License.
 #
 
-from gs1encoders import GS1Encoder, Symbology, Validation
+from gs1encoders import (
+    GS1Encoder,
+    GS1EncoderDigitalLinkException,
+    Symbology,
+    Validation,
+)
 
 
 def main():
@@ -59,11 +64,11 @@ def main():
         print(f"    {h}")
 
     # DL URI
-    dl_uri = gs1encoder.get_dl_uri("https://example.com")
-    if dl_uri:
+    try:
+        dl_uri = gs1encoder.get_dl_uri("https://example.com")
         print(f"\nDL URI: {dl_uri}")
-    else:
-        print(f"\nDL URI: Failed: {gs1encoder.err_markup}")
+    except GS1EncoderDigitalLinkException as e:
+        print(f"\nDL URI: Failed: {e}")
 
     # Scan data round-trip
     if gs1encoder.scan_data:

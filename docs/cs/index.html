@@ -89,6 +89,7 @@ and running:</p>
 <ol>
 <li>Include the wrapper source within your project</li>
 <li>Ensure <code>gs1encoders.dll</code> (the native library) is in the same directory as your executable or in a location on your system PATH</li>
+<li>Ensure the <a href="https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist">Microsoft Visual C++ Redistributable</a> is installed on the target system, with the architecture (x86 or x64) matching the native library build</li>
 </ol>
 <p>For a minimal example, create a console application as follows:</p>
 <pre><code>dotnet new console -n MyApp -f net8.0
@@ -116,9 +117,18 @@ library:</p>
 <pre><code class="lang-csharp">using System;
 using GS1.Encoders;
 
-GS1Encoder gs = new GS1Encoder();
-Console.WriteLine(&quot;GS1 Syntax Engine version: &quot; + gs.Version);
+using (GS1Encoder gs = new GS1Encoder())
+{
+    gs.AIdataStr = &quot;(01)09521234543213(99)TESTING123&quot;;
+    Console.WriteLine(&quot;GS1 Digital Link URI: &quot; + gs.GetDLuri(&quot;https://example.com&quot;));
+}
 </code></pre>
+<p><strong>Note:</strong> Each <code>GS1Encoder</code> instance allocates native resources. <code>GS1Encoder</code>
+implements <code>IDisposable</code>, so use a <code>using</code> block (as above) to ensure these
+resources are released promptly. Alternatively, call <code>Dispose()</code> or <code>Free()</code>
+explicitly when done.</p>
+<p><strong>Note:</strong> The library is thread-safe provided that each thread operates on its
+own <code>GS1Encoder</code> instance. Do not share a single instance across threads.</p>
 <p>Run your application:</p>
 <pre><code>dotnet run
 </code></pre>
@@ -253,10 +263,6 @@ Classes
       <h4><a class="xref" href="GS1.Encoders.GS1EncoderDigitalLinkException.html">GS1EncoderDigitalLinkException</a></h4>
       <section><p>A custom exception class that is thrown to indicate an error processing
 GS1 Digital Link data.</p>
-</section>
-      <h4><a class="xref" href="GS1.Encoders.GS1EncoderEncodeException.html">GS1EncoderEncodeException</a></h4>
-      <section><p>A custom exception class that is thrown to indicate a problem generating
-a barcode symbol.</p>
 </section>
       <h4><a class="xref" href="GS1.Encoders.GS1EncoderGeneralException.html">GS1EncoderGeneralException</a></h4>
       <section><p>A custom exception class that is thrown to indicate a general problem

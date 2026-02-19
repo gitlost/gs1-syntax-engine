@@ -60,6 +60,7 @@ static int processComponent(gs1_encoder* const ctx, char* const component, struc
 
 	// First component is the format specification
 	token = strtok_r(component, ",", &saveptr);
+	assert(token);	// Callers guarantee non-empty component
 	p = token;
 	len = strlen(p);
 	part->opt = (*p == '[') ? OPT : MAN;		// Component is optional
@@ -151,6 +152,13 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 	char buf[MAX_AI_ATTR_LEN + 2] = { 0 };
 	char linebuf[MAX_SD_ENTRY_LEN + 1] = { 0 };
 
+	*(*entry)->ai = '\0';
+	(*entry)->ailen = 0;
+	(*entry)->attrs = NULL;
+	(*entry)->title = NULL;
+	(*entry)->fnc1 = DO_FNC1;
+	(*entry)->dlDataAttr = NO_DATA_ATTR;
+
 	len = strlen(line);
 	if (len > MAX_SD_ENTRY_LEN)
 		error(ENTRY_TOO_LONG);
@@ -163,13 +171,6 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 
 	if ((uint16_t)(*entry - sd) >= cap - 1)
 		error(SYNTAX_DICTIONARY_CAPACITY_TOO_SMALL);
-
-	*(*entry)->ai = '\0';
-	(*entry)->ailen = 0;
-	(*entry)->attrs = NULL;
-	(*entry)->title = NULL;
-	(*entry)->fnc1 = DO_FNC1;
-	(*entry)->dlDataAttr = NO_DATA_ATTR;
 
 	// Initial token should be an AI or an AI range
 	len = strlen(token);
@@ -347,6 +348,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 		(*entry)->dlDataAttr = lastEntry->dlDataAttr;
 		for (part = 0; part < MAX_PARTS; part++) {
 			(*entry)->parts[part].cset = lastEntry->parts[part].cset;
+			(*entry)->parts[part].opt  = lastEntry->parts[part].opt;
 			(*entry)->parts[part].min  = lastEntry->parts[part].min;
 			(*entry)->parts[part].max  = lastEntry->parts[part].max;
 			for (linter = 0; linter < MAX_LINTERS; linter++)
@@ -393,6 +395,8 @@ static struct aiEntry* parseSyntaxDictionaryFile(gs1_encoder* const ctx, const c
 	if (!sd)
 		error(FAILED_TO_ALLOCATE_AI_TABLE);
 	sd[0].ai[0] = '\0';
+	sd[0].attrs = NULL;
+	sd[0].title = NULL;
 
 	fp = fopen(fname, "r");
 	if (fp == NULL)
@@ -421,7 +425,7 @@ static struct aiEntry* parseSyntaxDictionaryFile(gs1_encoder* const ctx, const c
 
 fail:
 	if (fp) fclose(fp);
-	gs1_freeSyntaxDictionaryEntries(ctx, sd);
+	if (sd) gs1_freeSyntaxDictionaryEntries(ctx, sd);
 	GS1_ENCODERS_FREE(sd);
 	return NULL;
 
