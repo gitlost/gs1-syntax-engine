@@ -1123,6 +1123,9 @@ void test_ai_lookupAIentry(void) {
 	TEST_CHECK(gs1_lookupAIentry(ctx, "4199", 4) == NULL);				// Don't vivify (4199) since AI prefix "41" is defined as having length 3
 	TEST_CHECK(gs1_lookupAIentry(ctx, "419", 3) == &unknownAI3fixed13);		// So (419) is okay, not requiring FNC1
 
+	TEST_CHECK(gs1_lookupAIentry(ctx, "23XABC", 0) == NULL);			// Don't vivify when non-digit in AI position (prefix "23" = len 3, "23X" has non-digit)
+	TEST_CHECK(gs1_lookupAIentry(ctx, "3199", 4) == &unknownAI4fixed6);		// Vivify (3199) as fixed-6 since prefix "31" has value length 6
+
 	gs1_encoder_free(ctx);
 
 }
@@ -1360,6 +1363,71 @@ void test_ai_parseAIdata(void) {
 	test_parseAIdata(false, "(01)123456789012312(10)12345", "");				// Fixed-length AI too long
 	test_parseAIdata(false, "(10)12345^", "");						// Reject "^": Conflated with FNC1
 	test_parseAIdata(false, "(17)9(90)217", "");						// Should not parse to ^7990217
+
+
+	/*
+	 *  MAX_AI_VALUE_LEN boundary: AI (99) accepts X..90
+	 *
+	 */
+	{
+		char inbuf[256];
+		char expbuf[256];
+		int j;
+
+		memcpy(inbuf, "(99)", 4);
+		for (j = 0; j < 90; j++)
+			inbuf[4 + j] = 'A';
+		inbuf[94] = '\0';
+
+		memcpy(expbuf, "^99", 3);
+		for (j = 0; j < 90; j++)
+			expbuf[3 + j] = 'A';
+		expbuf[93] = '\0';
+
+		test_parseAIdata(true, inbuf, expbuf);				// Exactly 90 chars
+
+		inbuf[95] = '\0';
+		inbuf[94] = 'A';
+		test_parseAIdata(false, inbuf, "");				// 91 chars, too long
+	}
+
+
+	/*
+	 *  MAX_AIS boundary: 64 AIs using (99)
+	 *
+	 *  Call gs1_parseAIdata directly with a larger output buffer
+	 *  since do_test_parseAIdata uses a 256-byte out buffer.
+	 *
+	 */
+	{
+		char inbuf[512];
+		char outbuf[512];
+		char *ip;
+		int j;
+
+		// Build bracketed AI string with exactly MAX_AIS (64) AIs
+		ip = inbuf;
+		for (j = 0; j < MAX_AIS; j++) {
+			*ip++ = '('; *ip++ = '9'; *ip++ = '9'; *ip++ = ')';
+			*ip++ = 'A' + (char)(j / 26);
+			*ip++ = 'A' + (char)(j % 26);
+		}
+		*ip = '\0';
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+		TEST_CHECK(gs1_parseAIdata(ctx, inbuf, outbuf));	// Exactly 64 AIs
+
+		// One more AI pushes over the limit
+		*ip++ = '('; *ip++ = '9'; *ip++ = '9'; *ip++ = ')';
+		*ip++ = 'Z'; *ip++ = 'Z';
+		*ip = '\0';
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+		TEST_CHECK(!gs1_parseAIdata(ctx, inbuf, outbuf));	// 65 AIs, too many
+	}
+
 
 	gs1_encoder_free(ctx);
 
@@ -1646,6 +1714,71 @@ void test_ai_processAIdata(void) {
 	test_processAIdata(true,  "^423528528528528528");
 	test_processAIdata(false,  "^4235285285285285285");			// Too long
 
+
+	/*
+	 *  MAX_AI_VALUE_LEN boundary: AI (99) accepts X..90
+	 *
+	 */
+	{
+		char buf[256];
+		int j;
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+
+		memcpy(buf, "^99", 3);
+		for (j = 0; j < 90; j++)
+			buf[3 + j] = 'A';
+		buf[93] = '\0';
+		test_processAIdata(true, buf);				// Exactly 90 chars
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+
+		buf[94] = '\0';
+		buf[93] = 'A';
+		test_processAIdata(false, buf);				// 91 chars, too long
+	}
+
+
+	/*
+	 *  MAX_AIS boundary: 64 AIs using (99) with identical values
+	 *
+	 *  Each AI is "99XX^" (FNC1 separated) except the last.
+	 *
+	 */
+	{
+		// 65 AIs * "^99XY" = 325 + null
+		char buf[512];
+		char *p;
+		int j;
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+
+		// Build string with exactly MAX_AIS (64) variable-length AIs
+		p = buf;
+		*p++ = '^';
+		for (j = 0; j < MAX_AIS; j++) {
+			if (j > 0)
+				*p++ = '^';	// FNC1 separator
+			*p++ = '9'; *p++ = '9';
+			*p++ = 'X'; *p++ = 'Y';
+		}
+		*p = '\0';
+		test_processAIdata(true, buf);				// Exactly 64 AIs
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+
+		// One more AI pushes over the limit
+		*p++ = '^';
+		*p++ = '9'; *p++ = '9'; *p++ = 'X'; *p++ = 'Y';
+		*p = '\0';
+		test_processAIdata(false, buf);				// 65 AIs, too many
+	}
+
+
 	// Unlike parsed data input, we cannot vivify unknown AIs when
 	// extracting AI data from a raw string
 	gs1_encoder_setPermitUnknownAIs(ctx, true);
@@ -1735,6 +1868,12 @@ void test_ai_validateAIs(void) {
 	test_validateAIs(false, validateAImutex, "(3940)1234(8111)9999");
 	test_validateAIs(false, validateAImutex, "(3940)1234(3941)9999");	// Match by "394n", ignoring self
 	test_validateAIs(false, validateAImutex, "(3955)123456(3929)123");	// Match by "392n"
+
+	// Mutex between known and unknown AIs: (3333) ex=333n should conflict with unknown (3338)
+	test_validateAIs(false, validateAImutex, "(3333)333333(3338)030333");
+	test_validateAIs(false, validateAImutex, "(01)12345678901231(3333)333333(3338)030333");
+	test_validateAIs(false, validateAImutex, "(3338)030333(3333)333333");
+	test_validateAIs(false, validateAImutex, "(3300)000000(3333)333333(3338)030333");	// Extra 33xx AI shifts sort order
 
 
 	/*

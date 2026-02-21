@@ -484,13 +484,16 @@ static void test_parseSyntaxDictionaryEntry(gs1_encoder* const ctx, char* const 
 	const uint16_t cap = 600;
 	int16_t numOut, expectOut = 0;
 	size_t i, j, k;
-	char buf[256];
+	char buf[256] = {0};
 	struct aiEntry *out, *tmp;
 
 	TEST_CASE(sdEntry);
 
-	TEST_ASSERT((out = GS1_ENCODERS_CALLOC(cap, sizeof(struct aiEntry))) != NULL);
-	assert(out);
+	out = GS1_ENCODERS_CALLOC(cap, sizeof(struct aiEntry));
+	if (!out) {
+		TEST_ASSERT(out != NULL);
+		goto out;
+	}
 
 	*out->ai = '\0';
 	tmp = out;
@@ -794,7 +797,10 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	{ false, "90  X5  =value", {							/* Missing attribute name (LHS) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  Req=01", {							/* Attribute name: illegal chars */
+	{ false, "90  X5  Req=01", {							/* Attribute name: illegal chars (caught as bad component) */
+		AI_ENTRY_TERMINATOR
+	} },
+	{ false, "90  X5  req1=01", {							/* Attribute name: illegal chars (digit in name) */
 		AI_ENTRY_TERMINATOR
 	} },
 	{ false, "90  X5  req=!!", {							/* Attribute value: illegal chars */
@@ -803,7 +809,10 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	{ false, "90  X5  req=", {							/* Missing attribute value (RHS) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  Req", {							/* Singleton name: illegal chars */
+	{ false, "90  X5  Req", {							/* Singleton name: illegal chars (caught as bad component) */
+		AI_ENTRY_TERMINATOR
+	} },
+	{ false, "90  X5  req1", {							/* Singleton name: illegal chars (digit in name) */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -818,6 +827,22 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	{ false, "90  X5  # @title", {							/* Title: illegal characters */
 		AI_ENTRY_TERMINATOR
 	} },
+
+	/*
+	 *  Attributes too long: cumulative attributes exceed MAX_AI_ATTR_LEN + 2 buffer
+	 *
+	 */
+	{ false, "90  X5  req=aaaaaaaaaa req=bbbbbbbbbb req=cccccccccc req=dddddddddd req=eeeeeeeeee", {
+		AI_ENTRY_TERMINATOR
+	} },
+
+	/*
+	 *  Entry too long: exceeds MAX_SD_ENTRY_LEN (150)
+	 *
+	 */
+	{ false, "90  X5  # title_padding_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", {
+		AI_ENTRY_TERMINATOR
+	} },
 };
 
 void test_syn_parseSyntaxDictionaryEntry(void) {
@@ -830,6 +855,26 @@ void test_syn_parseSyntaxDictionaryEntry(void) {
 
 	for (i = 0; i < SIZEOF_ARRAY(tests_parse_sd_entry); i++)
 		test_parseSyntaxDictionaryEntry(ctx, tests_parse_sd_entry[i].sdEntry, tests_parse_sd_entry[i].aiEntries, tests_parse_sd_entry[i].expectSuccess);
+
+	gs1_encoder_free(ctx);
+
+}
+
+
+void test_syn_allocFailures(void) {
+
+	gs1_encoder* ctx;
+
+	TEST_ASSERT((ctx = gs1_encoder_init(NULL)) != NULL);
+	assert(ctx);
+
+	/*
+	 *  parseSyntaxDictionaryFile: malloc failure for AI table
+	 *
+	 */
+	test_alloc_fail_at = 1;
+	TEST_CHECK(gs1_loadSyntaxDictionary(ctx, NULL, true) == NULL);
+	test_alloc_fail_at = 0;
 
 	gs1_encoder_free(ctx);
 

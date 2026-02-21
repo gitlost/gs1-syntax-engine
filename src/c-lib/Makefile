@@ -48,7 +48,7 @@ endif
 
 ifeq ($(MAKECMDGOALS),test)
 BUILD_DIR = build-test
-UNIT_TEST_CFLAGS = -DUNIT_TESTS
+UNIT_TEST_CFLAGS = -DUNIT_TESTS -DGS1_ENCODERS_CUSTOM_HEAP_MANAGEMENT_H=test-heap.h
 endif
 
 WASM_DIR = ../js-wasm
@@ -87,6 +87,14 @@ ifeq ($(MAKECMDGOALS),clean-fuzzer)
 BUILD_DIR = build-fuzzer
 endif
 
+ifeq ($(MAKECMDGOALS),clean-msan)
+BUILD_DIR = build-msan
+endif
+
+ifeq ($(MAKECMDGOALS),clean-coverage)
+BUILD_DIR = build-coverage
+endif
+
 ifeq ($(MAKECMDGOALS),clean-wasm)
 BUILD_DIR = build-wasm
 endif
@@ -113,6 +121,32 @@ SAN_CFLAGS = -fsanitize=address,leak,undefined$(FUZZER_SAN_OPT) -fno-omit-frame-
 SAN_ENV = ASAN_OPTIONS="symbolize=1 detect_leaks=1" LSAN_OPTIONS="fast_unwind_on_malloc=0:malloc_context_size=50" ASAN_SYMBOLIZER_PATH="$(shell which llvm-symbolizer)"
 endif
 
+endif
+
+
+# MemorySanitizer: detects reads of uninitialised memory.
+# Mutually exclusive with ASAN so uses its own build directory.
+#
+#   make MSAN=yes test
+#
+ifeq ($(MSAN),yes)
+CC=clang
+BUILD_DIR = build-msan
+SAN_LDFLAGS = -fuse-ld=lld
+SAN_CFLAGS = -fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1
+SAN_ENV = MSAN_SYMBOLIZER_PATH="$(shell which llvm-symbolizer)"
+endif
+
+
+# Code coverage: builds with gcov instrumentation, runs tests and
+# generates an HTML report via lcov/genhtml.
+#
+#   make coverage
+#
+ifeq ($(COVERAGE),yes)
+BUILD_DIR = build-coverage
+CFLAGS_O = -O0
+COV_CFLAGS = --coverage
 endif
 
 
@@ -158,7 +192,7 @@ CFLAGS_FORTIFY = -D_FORTIFY_SOURCE=2
 NPROC = nproc
 endif
 
-CFLAGS = $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_FORTIFY) $(CFLAGS_V) -Wall -Wextra -Wconversion -Wformat=2 -Wshadow -Wdeclaration-after-statement -pedantic -Wundef -Wnull-dereference -Wstrict-prototypes -Werror -fstack-protector-strong -MMD -fPIC -DGS1_LINTER_ERR_STR_EN $(SAN_CFLAGS) $(ANALYZER_CFLAGS) $(UNIT_TEST_CFLAGS) $(DEBUG_CFLAGS) $(SLOW_TESTS_CFLAGS)
+CFLAGS = $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_FORTIFY) $(CFLAGS_V) -Wall -Wextra -Wconversion -Wformat=2 -Wshadow -Wdeclaration-after-statement -pedantic -Wundef -Wnull-dereference -Wstrict-prototypes -Werror -fstack-protector-strong -MMD -fPIC -DGS1_LINTER_ERR_STR_EN $(SAN_CFLAGS) $(COV_CFLAGS) $(ANALYZER_CFLAGS) $(UNIT_TEST_CFLAGS) $(DEBUG_CFLAGS) $(SLOW_TESTS_CFLAGS)
 
 APP = $(BUILD_DIR)/$(NAME).$(BIN_SUFFIX)
 APP_STATIC = $(BUILD_DIR)/$(NAME)-static.$(BIN_SUFFIX)
@@ -343,6 +377,19 @@ wasm: $(WASM_JS)
 test: $(TEST_BIN)
 	$(SAN_ENV) ./$(TEST_BIN) $(TEST)
 
+.PHONY: coverage
+coverage:
+	$(MAKE) COVERAGE=yes SLOW_TESTS=yes test
+	lcov --capture --directory build-coverage \
+		--output-file build-coverage/coverage.info
+	lcov --remove build-coverage/coverage.info \
+		'*/syntax/*' '*/gs1encoders-test.c' '*/gs1encoders-app.c' \
+		--output-file build-coverage/coverage.info
+	genhtml build-coverage/coverage.info \
+		--output-directory build-coverage/coverage-report
+	@echo
+	@echo "Coverage report: build-coverage/coverage-report/index.html"
+
 # Generate seeds for a specific fuzzer (internal target)
 .PHONY: fuzzer-corpus-seeds-%
 fuzzer-corpus-seeds-%: $(BUILD_DIR)/$(FUZZER_PREFIX)% | $(FUZZER_CORPUS_PREFIX)%/
@@ -399,7 +446,8 @@ fuzzer: $(FUZZER_BINS) | $(FUZZER_CORPUSES) fuzzer-corpus-seeds
 
 .PHONY: clean
 clean:
-	$(RM) $(OBJS) $(APP_OBJ) $(APP) $(APP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build build-test build-fuzzer build-msan build-coverage build-wasm
+	$(RM) $(WASM_DIST_FILES) *.gcov
 
 .PHONY: clean-test
 clean-test:
@@ -408,6 +456,14 @@ clean-test:
 .PHONY: clean-fuzzer
 clean-fuzzer:
 	$(RM) $(OBJS) $(APP_OBJ) $(APP) $(APP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+
+.PHONY: clean-msan
+clean-msan:
+	$(RM) $(OBJS) $(APP_OBJ) $(APP) $(APP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+
+.PHONY: clean-coverage
+clean-coverage:
+	$(RM) -r build-coverage
 
 .PHONY: clean-fuzzer-corpus
 clean-fuzzer-corpus:

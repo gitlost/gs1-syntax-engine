@@ -38,7 +38,9 @@
 
 
 #define CANONICAL_DL_STEM "https://id.gs1.org"
+#ifndef DL_KEY_QUALIFIER_INITIAL_CAPACITY
 #define DL_KEY_QUALIFIER_INITIAL_CAPACITY 50
+#endif
 
 
 /*
@@ -262,7 +264,7 @@ bool gs1_populateDLkeyQualifiers(gs1_encoder* const ctx) {
 	int i = 0;
 	size_t pos = 0, cap = DL_KEY_QUALIFIER_INITIAL_CAPACITY;
 
-	char **dlKeyQualifiers = malloc(cap * sizeof(char *));
+	char **dlKeyQualifiers = GS1_ENCODERS_MALLOC(cap * sizeof(char *));
 	if (!dlKeyQualifiers) {
 		SET_ERR(FAILED_TO_MALLOC_FOR_KEY_QUALIFIERS);
 		return false;
@@ -323,8 +325,8 @@ fail:
 	 * Release what we have allocated so far
 	 *
 	 */
-	for (i--; i >= 0; i--)
-		GS1_ENCODERS_FREE(dlKeyQualifiers[i]);
+	while (pos > 0)
+		GS1_ENCODERS_FREE(dlKeyQualifiers[--pos]);
 	GS1_ENCODERS_FREE(dlKeyQualifiers);
 
 	return false;
@@ -402,7 +404,7 @@ static inline bool isValidDLpathAIseq(const gs1_encoder* const ctx, const char (
 }
 
 static inline bool isDLpkey(const gs1_encoder* const ctx, const struct aiEntry* const entry) {
-	char seq[1][MAX_AI_LEN+1];
+	char seq[1][MAX_AI_LEN+1] = {{0}};
 	memcpy(seq[0], entry->ai, entry->ailen);
 	seq[0][entry->ailen] = '\0';
 	return getDLpathAIseqEntry(ctx, (const char (*)[MAX_AI_LEN+1])seq, 1) != -1;
@@ -1032,7 +1034,7 @@ char* gs1_generateDLuri(gs1_encoder* const ctx, const char* const stem) {
 	 */
 	for (i = 0; i < ctx->numAIs; i++) {
 
-		char seq[1][MAX_AI_LEN+1];
+		char seq[1][MAX_AI_LEN+1] = {{0}};
 		int ke;
 		const struct aiValue* const ai = &ctx->aiData[i];
 
@@ -1225,7 +1227,7 @@ again:
 
 static void do_test_parseDLuri(gs1_encoder* const ctx, const char* const file, const int line, bool should_succeed, const char* const dlData, const char* const expect) {
 
-	char in[256];
+	char in[256] = {0};
 	char out[256];
 	char casename[256];
 
@@ -1346,6 +1348,15 @@ void test_dl_parseDLuri(void) {
 	test_parseDLuri(false,					// Bad character in domain
 		"https://a$/006141411234567890",
 		"");
+
+	/* Illegal URI characters outside uriCharacters set */
+	test_parseDLuri(false, "https://a/01/12312312312333<bad", "");
+	test_parseDLuri(false, "https://a/01/12312312312333>bad", "");
+	test_parseDLuri(false, "https://a/01/12312312312333{bad", "");
+	test_parseDLuri(false, "https://a/01/12312312312333}bad", "");
+	test_parseDLuri(false, "https://a/01/12312312312333\\bad", "");
+	test_parseDLuri(false, "https://a/01/12312312312333^bad", "");
+	test_parseDLuri(false, "https://a/01/12312312312333`bad", "");
 
 	/*
 	 * Custom stem
@@ -1675,6 +1686,61 @@ void test_dl_parseDLuri(void) {
 	gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vUNKNOWN_AI_NOT_DL_ATTR, true);
 	gs1_encoder_setPermitUnknownAIs(ctx, false);
 
+
+	/* Empty AI value in DL path element */
+	test_parseDLuri(false, "https://a/01//12312312312333", "");
+
+	/* Percent-encoded null in DL path value */
+	test_parseDLuri(false, "https://a/01/1231231231233%003", "");
+
+	/* Percent-encoded null in DL query value */
+	test_parseDLuri(false, "https://a/01/12312312312333?99=ABC%00DEF", "");
+
+
+	/*
+	 *  MAX_AI_VALUE_LEN boundary: AI (99) accepts X..90 in query
+	 *
+	 */
+	{
+		char dlbuf[512] = {0};
+		char outbuf[512];
+		char *p;
+		int j;
+
+		// Build DL URI with AI (01) in path and AI (99) with 90-char value in query
+		p = dlbuf;
+		strcpy(p, "https://a/01/12312312312333?99=");
+		p += strlen(p);
+		for (j = 0; j < 90; j++)
+			*p++ = 'A';
+		*p = '\0';
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+		TEST_CHECK(gs1_parseDLuri(ctx, dlbuf, outbuf));		// Exactly 90 chars
+
+		// 91-char value should fail
+		*p++ = 'A';
+		*p = '\0';
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+		TEST_CHECK(!gs1_parseDLuri(ctx, dlbuf, outbuf));	// 91 chars, too long
+	}
+
+
+	/*
+	 *  Empty AI value in DL path element during forward processing
+	 *
+	 */
+	test_parseDLuri(false, "https://a/01/12312312312333/10/", "");
+
+	/*
+	 *  Invalid key-qualifier sequence in DL path
+	 *
+	 */
+	test_parseDLuri(false, "https://a/01/12312312312333/99/ABC", "");
+
+
 #undef test_parseDLuri
 
 	gs1_encoder_free(ctx);
@@ -1973,6 +2039,9 @@ void test_dl_generateDLuri(void) {
 	test_testGenerateDLuri(true, "https://example.com", "(01)12312312312326(22)ABC(10)DEF(21)GHI(95)INT", "https://example.com/01/12312312312326/22/ABC/10/DEF/21/GHI?95=INT");
 	test_testGenerateDLuri(true, "https://example.com", "(21)XYZ(01)12312312312333(10)ABC123(99)XYZ", "https://example.com/01/12312312312333/10/ABC123/21/XYZ?99=XYZ");
 
+	/* No primary key AI: cannot generate DL URI */
+	test_testGenerateDLuri(false, "https://example.com", "(99)XYZ789", "");
+
 	/*
 	 * "+" represents space in query info but not path components
 	 *
@@ -2047,7 +2116,78 @@ void test_dl_generateDLuri(void) {
 		}
 	}
 
+	/*
+	 *  Stem with trailing slash: should be trimmed
+	 *
+	 */
+	test_testGenerateDLuri(true, "https://example.com/", "(01)12312312312326", "https://example.com/01/12312312312326");
+
+	/*
+	 *  Composite data (ccsep before primary key AI): line 1040
+	 *
+	 */
+	{
+		const char *uri;
+
+		TEST_CASE("Composite with ccsep before pkey in AI list");
+		TEST_CHECK(gs1_encoder_setDataStr(ctx, "^99ABC|^0112312312312333^10DEF") == true);
+		TEST_MSG("Parse failed. Err: %s", ctx->errMsg);
+		TEST_CHECK((uri = gs1_generateDLuri(ctx, "https://example.com")) != NULL);
+		if (uri) {
+			TEST_CHECK(strcmp(uri, "https://example.com/01/12312312312333/10/DEF?99=ABC") == 0);
+			TEST_MSG("Got: '%s'", uri);
+		}
+	}
+
 #undef test_testGenerateDLuri
+
+	gs1_encoder_free(ctx);
+
+}
+
+
+void test_dl_allocFailures(void) {
+
+	gs1_encoder* ctx;
+	int i;
+
+	TEST_ASSERT((ctx = gs1_encoder_init(NULL)) != NULL);
+	assert(ctx);
+
+	/*
+	 *  Allocation sequence for gs1_populateDLkeyQualifiers:
+	 *    1: dlKeyQualifiers initial malloc
+	 *    2: first gs1_strdup_alloc for key
+	 *    3: first q_new malloc for qualifier combo
+	 *    ...
+	 *
+	 */
+
+	/*
+	 *  Alloc 1: dlKeyQualifiers initial malloc failure
+	 *
+	 */
+	gs1_freeDLkeyQualifiers(ctx);
+	test_alloc_fail_at = 1;
+	TEST_CHECK(gs1_populateDLkeyQualifiers(ctx) == false);
+	test_alloc_fail_at = 0;
+
+	/*
+	 *  Allocs 2..5: exercise progressively later allocation failures
+	 *  in addDLkeyQualifiers (realloc, gs1_strdup_alloc, qualifier
+	 *  combo malloc)
+	 *
+	 */
+	for (i = 2; i <= 5; i++) {
+		gs1_freeDLkeyQualifiers(ctx);
+		test_alloc_fail_at = i;
+		TEST_CHECK(gs1_populateDLkeyQualifiers(ctx) == false);
+		test_alloc_fail_at = 0;
+	}
+
+	// Restore valid state for cleanup
+	gs1_freeDLkeyQualifiers(ctx);
+	TEST_CHECK(gs1_populateDLkeyQualifiers(ctx) == true);
 
 	gs1_encoder_free(ctx);
 
