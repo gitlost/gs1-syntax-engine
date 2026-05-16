@@ -47,6 +47,7 @@ let package = Package(
                 // Exclude test, fuzzer, and utility files from the C library
                 "c-lib/gs1encoders-app.c",
                 "c-lib/gs1encoders-test.c",
+                "c-lib/gs1encoders-test.cpp",
                 "c-lib/gs1encoders-fuzzer-ais.c",
                 "c-lib/gs1encoders-fuzzer-data.c",
                 "c-lib/gs1encoders-fuzzer-dl.c",
@@ -88,6 +89,9 @@ let package = Package(
             dependencies: ["GS1Encoders"]),
         .testTarget(
             name: "GS1EncodersTests",
-            dependencies: ["GS1Encoders"]),
+            dependencies: ["GS1Encoders"],
+            resources: [
+                .copy("gs1-syntax-dictionary.txt")
+            ]),
     ]
 )

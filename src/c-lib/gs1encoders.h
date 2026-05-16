@@ -23,14 +23,29 @@
  *
  * @endlicenseblock
  *
- * API reference for the GS1 Barcode Syntax Engine. For an overview, examples and usage
- * instructions, see the main documentation page.
+ * Public C API header for the GS1 Barcode Syntax Engine. For an overview, examples
+ * and usage instructions, see the main documentation page. C++ users may prefer the
+ * RAII C++ wrapper in gs1encoders.hpp; see the [C++ API](@ref cppapi) topic.
  *
+ */
+
+/**
+ * @defgroup capi C API
+ * @brief Native C interface declared in `gs1encoders.h`.
+ *
+ * The C API exposes free functions that operate on an opaque
+ * ::gs1_encoder context, plus the supporting enums and the
+ * ::gs1_encoder_init_opts_t initialisation structure. Use this surface
+ * directly from C, or via the [C++ wrapper](@ref cppapi) for an
+ * idiomatic RAII / exception-based interface.
  */
 
 
 #ifndef GS1_ENCODERS_H
 #define GS1_ENCODERS_H
+
+/// @addtogroup capi
+/// @{
 
 /// \cond
 #include <stdbool.h>
@@ -60,6 +75,12 @@
 #  define GS1_ENCODERS_DEPRECATED __declspec(deprecated)
 #else
 #  define GS1_ENCODERS_DEPRECATED
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#  define GS1_ENCODERS_DEPRECATED_ENUM __attribute__((__deprecated__))
+#else
+#  define GS1_ENCODERS_DEPRECATED_ENUM
 #endif
 
 
@@ -118,11 +139,11 @@ typedef enum gs1_encoder_validations gs1_encoder_validations_t;
 
 /// Initialisation flags for gs1_encoder_init_ex().
 enum gs1_encoder_init_flags {
-	gs1_encoder_iDEFAULT                   = 0,		///< Default: Use Syntax Dictionary if the file exists, otherwise fallback to the embedded AI table (if compiled in).
-	gs1_encoder_iNO_SYNDICT                = 1 << 0,	///< Disable use of the Syntax Dictionary, even if the file exists.
-	gs1_encoder_iNO_EMBEDDED               = 1 << 1,	///< Disable use of the embedded AI table, even if it is compiled in.
-	gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR = 1 << 2,	///< Fallback to the embedded AI table (if not disabled and is compiled in) when encountering a parsing error with the Syntax Dictionary.
-	gs1_encoder_iQUIET                     = 1 << 3,	///< Suppress initialisation error output to stdout.
+	gs1_encoder_iDEFAULT							= 0,		///< Default: Use the embedded AI table (if compiled in). Set @ref gs1_encoder_init_opts::syntaxDictionary to load a Syntax Dictionary file instead.
+	gs1_encoder_iNO_SYNDICT			GS1_ENCODERS_DEPRECATED_ENUM	= 1 << 0,	///< @deprecated No-op, retained for source/ABI compatibility. Syntax Dictionary loading is now controlled by @ref gs1_encoder_init_opts::syntaxDictionary : it is loaded only when a non-NULL path is provided.
+	gs1_encoder_iNO_EMBEDDED						= 1 << 1,	///< Disable use of the embedded AI table, even if it is compiled in.
+	gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR					= 1 << 2,	///< Fallback to the embedded AI table (if not disabled and is compiled in) when loading the explicit @ref gs1_encoder_init_opts::syntaxDictionary fails.
+	gs1_encoder_iQUIET			GS1_ENCODERS_DEPRECATED_ENUM	= 1 << 3,	///< @deprecated No-op, retained for source/ABI compatibility. The library no longer writes initialisation messages to stdout; error information is returned via @ref gs1_encoder_init_opts::status and @ref gs1_encoder_init_opts::msgBuf.
 };
 
 
@@ -136,10 +157,10 @@ typedef enum gs1_encoder_init_flags gs1_encoder_init_flags_t;
 /// Initialisation status codes returned by gs1_encoder_init_ex().
 enum gs1_encoder_init_status {
 	GS1_ENCODERS_INIT_SUCCESS                    =  0,	///< Initialised successfully
-	GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE =  1,	///< An indication that the Syntax Dictionary was either not found, or a parse error encountered with ::gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR enabled, therefore the embedded AI table was loaded.
+	GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE =  1,	///< The explicit @ref gs1_encoder_init_opts::syntaxDictionary could not be loaded (e.g. file not found or parse error), but ::gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR was set, so the embedded AI table was loaded instead.
 	GS1_ENCODERS_INIT_FAILED_NO_MEM              = -1,	///< Memory allocation failed during initialisation.
 	GS1_ENCODERS_INIT_FAILED_NO_EMBEDDED_TABLE   = -2,	///< The embedded AI table would be used but it is compiled out or disabled (::gs1_encoder_iNO_EMBEDDED is set).
-	GS1_ENCODERS_INIT_FAILED_LOADING_SYNDICT     = -3,	///< The Syntax Dictionary failed to parse and fallback to the embedded table was disabled (::gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR not set).
+	GS1_ENCODERS_INIT_FAILED_LOADING_SYNDICT     = -3,	///< The explicit @ref gs1_encoder_init_opts::syntaxDictionary could not be loaded (e.g. file not found or parse error) and ::gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR was not set.
 	GS1_ENCODERS_INIT_FAILED_AI_TABLE_CORRUPT    = -4,	///< The embedded AI table failed to process.
 };
 
@@ -157,11 +178,12 @@ typedef enum gs1_encoder_init_status gs1_encoder_init_status_t;
  * @note Legacy code will continue to work if new fields are added at the end.
  */
 struct gs1_encoder_init_opts {
-	size_t struct_size;				///< Must be initialised to sizeof(gs1_encoder_init_opts_t)
-	gs1_encoder_init_flags_t flags;			///< Initialization flags (bitwise OR of gs1_encoder_init_flags values)
-	gs1_encoder_init_status_t *status;		///< Optional pointer to receive initialisation status code (may be NULL)
-	char *msgBuf;					///< Optional buffer to receive error message (may be NULL)
-	size_t msgBufSize;				///< Size of msgBuf in bytes (0 if no buffer)
+	size_t struct_size;			///< Must be initialised to sizeof(gs1_encoder_init_opts_t)
+	gs1_encoder_init_flags_t flags;		///< Initialization flags (bitwise OR of gs1_encoder_init_flags values)
+	gs1_encoder_init_status_t *status;	///< Optional pointer to receive initialisation status code (may be NULL)
+	char *msgBuf;				///< Optional buffer to receive error message (may be NULL)
+	size_t msgBufSize;			///< Size of msgBuf in bytes (0 if no buffer)
+	const char *syntaxDictionary;		///< Optional path to a Syntax Dictionary file. NULL (default) uses the embedded AI table.
 };
 
 
@@ -186,9 +208,10 @@ typedef struct gs1_encoder_init_opts gs1_encoder_init_opts_t;
  * only be modified using the public API functions provided by this library,
  * decorated with GS1_ENCODERS_API.
  *
- * A context is created by calling gs1_encoder_init() or gs1_encoder_init_ex()
- * and destroyed by calling gs1_encoder_free(), releasing all of the storage
- * allocated by the library for that instance.
+ * A context is created by calling gs1_encoder_init_ex() (or the legacy
+ * gs1_encoder_init(), which is deprecated) and destroyed by calling
+ * gs1_encoder_free(), releasing all of the storage allocated by the library
+ * for that instance.
  *
  * \note
  * This struct is deliberately opaque and it's layout should be assumed to vary
@@ -233,7 +256,7 @@ GS1_ENCODERS_API char* gs1_encoder_getVersion(void);
  * size_t mem = gs1_encoder_instanceSize();
  * void *heap = malloc(mem);
  * assert(heap);
- * ctx = gs1_encoder_init(heap);
+ * ctx = gs1_encoder_init_ex(heap, NULL);
  * ...
  * gs1_encoder_free(ctx);
  * free(heap);
@@ -249,7 +272,7 @@ GS1_ENCODERS_API char* gs1_encoder_getVersion(void);
  * 	gs1_encoder *ctx;
  * 	size_t mem = gs1_encoder_instanceSize();
  * 	assert(sizeof(prealloc) <= mem);
- * 	ctx = gs1_encoder_init((void *)prealloc);
+ * 	ctx = gs1_encoder_init_ex((void *)prealloc, NULL);
  * 	...
  * }
  * \endcode
@@ -279,6 +302,15 @@ GS1_ENCODERS_API int gs1_encoder_getMaxDataStrLength(void);
 /**
  * @brief Initialise a new ::gs1_encoder context.
  *
+ * @deprecated Use gs1_encoder_init_ex() instead. This legacy entry point
+ * attempts to load `gs1-syntax-dictionary.txt` from the current working
+ * directory and silently falls back to the embedded AI table if the file
+ * is missing or malformed. New code should call gs1_encoder_init_ex(),
+ * which makes Syntax Dictionary loading explicit (via
+ * @ref gs1_encoder_init_opts::syntaxDictionary), reports the outcome via
+ * @ref gs1_encoder_init_opts::status and gives detailed error/warning
+ * messages via @ref gs1_encoder_init_opts::msgBuf.
+ *
  * If it expected that most users of the library will pass NULL to this
  * function which causes the library will allocate its own storage.
  *
@@ -287,20 +319,22 @@ GS1_ENCODERS_API int gs1_encoder_getMaxDataStrLength(void);
  * returned by gs1_encoder_instanceSize() and this buffer should not be reused
  * or freed until gs1_encoder_free() is called.
  *
+ * @see gs1_encoder_init_ex()
  * @see gs1_encoder_instanceSize()
  *
  * @param [in,out] mem buffer to use for storage, or NULL for automatic allocation
  * @return ::gs1_encoder context on success, else NULL.
  */
-GS1_ENCODERS_API gs1_encoder* gs1_encoder_init(void *mem);
+GS1_ENCODERS_API GS1_ENCODERS_DEPRECATED gs1_encoder* gs1_encoder_init(void *mem);
 
 
 /**
  * @brief Initialise a new ::gs1_encoder context with the extended interface.
  *
- * This is an extended version of gs1_encoder_init() that provides control over
- * Syntax Dictionary and embedded AI table loading behavior and reports
- * detailed initialisation status.
+ * This is the recommended initialisation entry point. It supersedes the
+ * deprecated gs1_encoder_init() and provides control over Syntax Dictionary
+ * and embedded AI table loading behaviour, reporting detailed initialisation
+ * status.
  *
  * Example of an extended initialisation:
  *
@@ -311,19 +345,20 @@ GS1_ENCODERS_API gs1_encoder* gs1_encoder_init(void *mem);
  * char msg[256]		// Sufficient, otherwise would truncate
  *
  * gs1_encoder_init_opts_t opts = {
- * 	.struct_size = sizeof(gs1_encoder_init_opts_t),
+ * 	.struct_size      = sizeof(gs1_encoder_init_opts_t),
  *
- *	// Silent fallback to the embedded AI table on Syntax Dictionary parse errors
- * 	.flags       = gs1_encoder_iQUIET|gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR,
+ *	// Fallback to the embedded AI table if the Syntax Dictionary cannot be loaded
+ * 	.flags            = gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR,
+ * 	.syntaxDictionary = "gs1-syntax-dictionary.txt",
  *
- * 	.status      = &status,		// What happened?
- * 	.msgBuf      = msg,		// Description of error or warning
- * 	.msgBufSize  = sizeof(msg)
+ * 	.status           = &status,	// What happened?
+ * 	.msgBuf           = msg,	// Description of error or warning
+ * 	.msgBufSize       = sizeof(msg)
  * };
  *
  * ctx = gs1_encoder_init_ex(NULL, &opts);
  *
- * // Initialisation failed, so do something with status or simply report the error
+ * // Initialisation failed, so do something based on status or simply report the error
  * if (ctx == NULL) {
  * 	printf("Failed to initialise GS1 Encoders library!\n");
  * 	if (*msg)
@@ -856,7 +891,7 @@ GS1_ENCODERS_API char* gs1_encoder_getAIdataStr(gs1_encoder *ctx);
  * #include <stdio.h>
  * #include "gs1encoders.h"
  *
- * gs1_encoder *ctx = gs1_encoder_init(NULL);               // Create a new instance of the library
+ * gs1_encoder *ctx = gs1_encoder_init_ex(NULL, NULL);      // Create a new instance of the library
  * gs1_encoder_setAIdataStr(ctx,                            // Set the input data (AI format on this occasion)
  *        "(01)12345678901231(10)ABC123(11)210630");
  * printf("DL URI: %s\n", gs1_encoder_getDLuri(ctx,         // Print the GS1 Digital Link URI with a custom domain and stem
@@ -916,7 +951,7 @@ GS1_ENCODERS_API char* gs1_encoder_getDLuri(gs1_encoder *ctx, const char *stem);
  * #include <stdio.h>
  * #include "gs1encoders.h"
  *
- * gs1_encoder *ctx = gs1_encoder_init(NULL);                  // Create a new instance of the library
+ * gs1_encoder *ctx = gs1_encoder_init_ex(NULL, NULL);         // Create a new instance of the library
  * if (!gs1_encoder_setScanData(ctx,                           // Process the scan data, setting dataStr and Sym)
  *        "]C1011231231231233310ABC123" "\x1D" "99TESTING"))
  *     exit 1;                                                 // Handle failure if bad AI data is received
@@ -982,7 +1017,7 @@ GS1_ENCODERS_API bool gs1_encoder_setScanData(gs1_encoder* ctx, const char *scan
  * #include <stdio.h>
  * #include "gs1encoders.h"
  *
- * gs1_encoder *ctx = gs1_encoder_init(NULL);               // Create a new instance of the library
+ * gs1_encoder *ctx = gs1_encoder_init_ex(NULL, NULL);      // Create a new instance of the library
  * gs1_encoder_setSym(ctx, gs1_encoder_sDataBarExpanded);   // Choose the symbology
  * gs1_encoder_setAIdataStr(ctx,                            // Set the input data (AI format on this occasion)
  *        "(01)12345678901231(10)ABC123(11)210630");
@@ -1170,6 +1205,9 @@ GS1_ENCODERS_API void gs1_encoder_free(gs1_encoder *ctx);
 
 #undef GS1_ENCODERS_API
 #undef GS1_ENCODERS_DEPRECATED
+
+
+/// @}  // end of capi group
 
 
 #endif /* GS1_ENCODERS_H */

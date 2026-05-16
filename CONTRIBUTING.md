@@ -160,7 +160,7 @@ Use prefixes to avoid collisions with user code:
 
 | Scope                | Prefix          | Example                     |
 |----------------------|-----------------|-----------------------------|
-| Public API functions | `gs1_encoder_`  | `gs1_encoder_init()`        |
+| Public API functions | `gs1_encoder_`  | `gs1_encoder_init_ex()`     |
 | Public types         | `gs1_encoder_`  | `gs1_encoder_symbologies_t` |
 | Public macros        | `GS1_ENCODERS_` | `GS1_ENCODERS_API`          |
 | Internal functions   | `gs1_`          | `gs1_parseAIdata()`         |
@@ -186,7 +186,8 @@ Use prefixes to avoid collisions with user code:
 
 | File                         | Purpose                                              |
 |------------------------------|------------------------------------------------------|
-| `gs1encoders.h`              | Public API header with all exported functions        |
+| `gs1encoders.h`              | Public C API header with all exported functions      |
+| `gs1encoders.hpp`            | Header-only C++ wrapper (requires C++17 or later)    |
 | `enc-private.h`              | Private header with internal definitions             |
 | `gs1encoders.c`              | API implementation and context management            |
 | `ai.c`                       | Application Identifier processing and validation     |
@@ -199,7 +200,8 @@ Use prefixes to avoid collisions with user code:
 | `debug.h`                    | Debugging macros (`DEBUG_PRINT`)                     |
 | `tr.h`, `tr_EN.h`            | Error message translation system                     |
 | `gs1encoders-app.c`          | Console demo application source                      |
-| `gs1encoders-test.c`         | Unit test harness                                    |
+| `gs1encoders-test.c`         | C unit test harness                                  |
+| `gs1encoders-test.cpp`       | C++ wrapper unit test harness (`make test-cpp`)      |
 | `gs1encoders-fuzzer-*.c`     | Fuzzer entry points (ais, data, dl, scandata, syn)   |
 | `build-embedded-ai-table.pl` | Generates `aitable.inc` from Syntax Dictionary       |
 
@@ -238,7 +240,7 @@ The library uses an opaque context pattern. All state is maintained in
 `gs1_encoder` instances:
 
 ```c
-gs1_encoder *ctx = gs1_encoder_init(NULL);
+gs1_encoder *ctx = gs1_encoder_init_ex(NULL, NULL);
 // ... use ctx ...
 gs1_encoder_free(ctx);
 ```
@@ -248,10 +250,11 @@ context contains all state and working memory for each instance of the library.
 
 ### Public vs Private Headers
 
-| Header          | Purpose                                                  |
-|-----------------|----------------------------------------------------------|
-| `gs1encoders.h` | Public API - included by user application code           |
-| `enc-private.h` | Private internals - included only by this library        |
+| Header            | Purpose                                                |
+|-------------------|--------------------------------------------------------|
+| `gs1encoders.h`   | Public C API - included by user application code       |
+| `gs1encoders.hpp` | Header-only C++ wrapper around `gs1encoders.h`         |
+| `enc-private.h`   | Private internals - included only by this library      |
 
 The public header declares `gs1_encoder` as an opaque incomplete type. The
 private header contains the complete struct definition. This separation:
@@ -275,7 +278,7 @@ object-oriented bindings:
 
 | C library Pattern                                      | Wrapper Pattern                               |
 |--------------------------------------------------------|-----------------------------------------------|
-| `gs1_encoder_init()` returns opaque `ctx`              | Constructor stores `ctx` as private handle    |
+| `gs1_encoder_init_ex()` returns opaque `ctx`           | Constructor stores `ctx` as private handle    |
 | `gs1_encoder_free(ctx)`                                | Custom destructor, either GC or explicit call |
 | `gs1_encoder_getX(ctx)` / `gs1_encoder_setX(ctx, val)` | Property or getter/setter methods             |
 | `bool` return indicates success/failure                | Throw exception on failure                    |
@@ -287,7 +290,7 @@ Languages handle this differently, based on development norms:
 - **C#**: Destructor (`~GS1Encoder()`) calls free automatically via garbage collection
 - **JavaScript**: Explicit `free()` method must be called by the user
 
-All context initialisation occurs in `gs1_encoder_init()`, and all working
+All context initialisation occurs in `gs1_encoder_init_ex()`, and all working
 buffers are contained within the context struct.
 
 Wrappers access all state through accessor functions
@@ -416,11 +419,15 @@ Tests use the Acutest framework.
 ```c
 void test_ai_lookupAIentry(void) {
     gs1_encoder* ctx;
-    TEST_ASSERT((ctx = gs1_encoder_init(NULL)) != NULL);
+    TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
     TEST_CHECK(strcmp(gs1_lookupAIentry(ctx, "01", 2)->ai, "01") == 0);
     gs1_encoder_free(ctx);
 }
 ```
+
+`GS1_ENCODER_UNIT_TEST_INIT()` (from `unittest.h`) wraps `gs1_encoder_init_ex()`
+with `iFALLBACK_ON_SYNDICT_ERROR` and a `gs1-syntax-dictionary.txt` path so CI
+exercises both the Syntax-Dictionary load path and the embedded-table fallback.
 
 ## Build
 
@@ -519,7 +526,8 @@ make -j $(nproc) test SLOW_TESTS=yes
 # Build and run specific test suite (regex match on test name)
 make test TEST="test_ai_"
 
-# Test with embedded AI table (instead of external Syntax Dictionary)
+# Run tests without the bundled Syntax Dictionary file
+# (the optional explicit-path test case is skipped; embedded-AI-table tests still run)
 rm gs1-syntax-dictionary.txt
 make test
 git checkout gs1-syntax-dictionary.txt  # Restore it
