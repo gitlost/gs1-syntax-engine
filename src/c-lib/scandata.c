@@ -560,7 +560,7 @@ fail:
 	*ctx->dataStr = '\0';
 	ctx->sym = gs1_encoder_sNONE;
 	if (*ctx->errMsg == '\0')
-		SET_ERR(FAILED_TO_PROCESS_SCAN_DATA);
+		SET_ERR(FAILED_TO_PROCESS_SCAN_DATA);  // LCOV_EXCL_LINE: belt-and-braces; every path reaching fail: already sets a specific error
 
 	return false;
 
@@ -633,7 +633,7 @@ void test_scandata_generateScanData(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 
 #define test_testGenerateScanData(n, d, e) do {							\
 	do_test_testGenerateScanData(ctx, __FILE__, __LINE__, #n, gs1_encoder_s##n, d, e);	\
@@ -833,7 +833,7 @@ void test_scandata_processScanData(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);											// Satisfy analyzer
 
 #define test_testProcessScanData(ss, sd, s, d) do {							\

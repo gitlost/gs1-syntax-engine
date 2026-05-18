@@ -182,12 +182,14 @@ gs1_encoder* gs1_encoder_init_ex(void *mem, const gs1_encoder_init_opts_t *opts)
 		case gs1_encoder_eFAILED_TO_REALLOC_FOR_KEY_QUALIFIERS:
 			localStatus = GS1_ENCODERS_INIT_FAILED_NO_MEM;
 			break;
+		// LCOV_EXCL_START: only reachable under EXCLUDE_EMBEDDED_AI_TABLE; otherwise setAItable falls back to embedded
 		case gs1_encoder_eAI_TABLE_BROKEN_PREFIXES_DIFFER_IN_LENGTH:
 			localStatus = GS1_ENCODERS_INIT_FAILED_AI_TABLE_CORRUPT;
 			break;
 		default:
 			localStatus = GS1_ENCODERS_INIT_FAILED_NO_EMBEDDED_TABLE;
 			break;
+		// LCOV_EXCL_STOP
 		}
 		RETURN_FAIL(localStatus, ctx->errMsg);
 
@@ -789,7 +791,7 @@ bool gs1_tokenise(const char *data, char delim, gs1_tok_t *tok) {
 	 *
 	 */
 	while (IN_BOUNDS(tok, p) && *p == delim)
-		p++;
+		p++;  // LCOV_EXCL_LINE: general-purpose tokeniser supports leading delims, but no current caller produces such input
 
 	/*
 	 *  No tokens left
@@ -873,11 +875,13 @@ __ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const
 			 *  that passes validation.
 			 *
 			 */
+			// LCOV_EXCL_START: defensive backward retry; current validating callers' data lands bsearch directly on the target
 			for (i = m; i > 0; i--)
 				if (compare(needle, haystack, i - 1) != 0)
 					break;
 				else if (validate(needle, haystack, i - 1))
 					return (ssize_t)(i - 1);
+			// LCOV_EXCL_STOP
 
 			for (i = m + 1; i < haystack_size; i++)
 				if (compare(needle, haystack, i) != 0)
@@ -1077,7 +1081,7 @@ void test_api_defaults(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(gs1_encoder_getSym(ctx) == gs1_encoder_sNONE);
@@ -1092,7 +1096,7 @@ void test_api_sym(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(!gs1_encoder_setSym(ctx, gs1_encoder_sNONE - 1));     // Too small
@@ -1148,7 +1152,7 @@ void test_api_addCheckDigit(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(!gs1_encoder_getAddCheckDigit(ctx));		// Default
@@ -1168,7 +1172,7 @@ void test_api_permitUnknownAIs(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(!gs1_encoder_getPermitUnknownAIs(ctx));		// Default
@@ -1188,7 +1192,7 @@ void test_api_permitZeroSuppressedGTINinDLuris(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(!gs1_encoder_getPermitZeroSuppressedGTINinDLuris(ctx));		// Default
@@ -1211,7 +1215,7 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	/*
@@ -1245,7 +1249,7 @@ void test_api_validations(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	// Unlocked validation that is enabled by default
@@ -1270,7 +1274,7 @@ void test_api_getters(void) {
 	const char *out;
 	char buf[256];
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	/*
@@ -1488,7 +1492,7 @@ void test_api_dataStr(void) {
 	gs1_encoder* ctx;
 	int i;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(gs1_encoder_setDataStr(ctx, "barcode"));
@@ -1685,7 +1689,7 @@ void test_api_getAIdataStr(void) {
 	gs1_encoder* ctx;
 	char *out;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	// Plain data
@@ -1735,7 +1739,7 @@ void test_api_getScanData(void) {
 	gs1_encoder* ctx;
 	char *out;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_ASSERT(gs1_encoder_setSym(ctx, gs1_encoder_sDataBarExpanded));
@@ -1753,7 +1757,7 @@ void test_api_setScanData(void) {
 
 	gs1_encoder* ctx;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_ASSERT(gs1_encoder_setScanData(ctx, "]e0011231231231233310ABC123" "\x1D" "99XYZ"));
@@ -1808,7 +1812,7 @@ void test_api_getHRI(void) {
 	char **hri;
 	char buf[256];
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	// HRI from linear-only, raw AI data
@@ -1930,7 +1934,7 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 	char buf[64];
 	size_t needed;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	// No HRI should return empty string
@@ -1967,7 +1971,7 @@ void test_api_getDLignoredQueryParams(void) {
 	char **qp;
 	char buf[256];
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	// No ignored query params from non-DL URI data
@@ -2033,7 +2037,7 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 	char buf[64];
 	size_t needed;
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	// No data should return empty string
@@ -2141,6 +2145,34 @@ void test_api_allocFailures(void) {
 		TEST_CHECK(ctx == NULL);
 		test_alloc_fail_at = 0;
 	}
+
+}
+
+
+void test_api_brokenPrefixSyndict(void) {
+
+	const char* const path = "test-syndict-broken-prefix.txt";
+	FILE *fp;
+
+	fp = fopen(path, "w");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("21   X..20  # SERIAL\n", fp);
+	fputs("210  N6     # CONFLICT\n", fp);	// Shares 2-digit prefix "21" with above; different length
+	fclose(fp);
+
+	{
+		gs1_encoder *ctx;
+		gs1_encoder_init_opts_t opts = {
+			.struct_size		= sizeof(gs1_encoder_init_opts_t),
+			.syntaxDictionary	= path,
+		};
+		ctx = gs1_encoder_init_ex(NULL, &opts);
+		TEST_CHECK(ctx != NULL);	// setAItable falls back to embedded
+		if (ctx) gs1_encoder_free(ctx);
+	}
+
+	remove(path);
 
 }
 

@@ -30,16 +30,18 @@ jobs:
           # For llvm-symbolizer
           sudo apt-get -y --no-install-recommends install llvm
 
-          # Load AI table from external Syntax Dictionary
+          echo '::group::C tests with external Syntax Dictionary (clang+ASAN+LSAN+UBSAN)'
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            make -C src/c-lib -j "$(nproc)" test \
+              CC=clang SANITIZE=yes SLOW_TESTS=yes
+          echo '::endgroup::'
+
+          echo '::group::C tests with embedded AI table (clang+ASAN+LSAN+UBSAN)'
           make -C src/c-lib -j "$(nproc)" test \
             CC=clang SANITIZE=yes SLOW_TESTS=yes
+          echo '::endgroup::'
 
-          # Re-run using the embedded AI table
-          rm src/c-lib/gs1-syntax-dictionary.txt
-          make -C src/c-lib -j "$(nproc)" test \
-            CC=clang SANITIZE=yes SLOW_TESTS=yes
-          git checkout src/c-lib/gs1-syntax-dictionary.txt
-
+          echo '::group::Build shared lib and apps (clang+ASAN+LSAN+UBSAN)'
           make -C src/c-lib -j "$(nproc)" lib \
             CC=clang SANITIZE=yes
 
@@ -53,6 +55,25 @@ jobs:
             CC=clang SANITIZE=yes
           ( cd src/c-lib && \
             build/gs1encoders-static.bin --version )
+          echo '::endgroup::'
+
+          echo '::group::C++ wrapper tests (clang+ASAN+LSAN+UBSAN)'
+          make -C src/c-lib -j "$(nproc)" test-cpp \
+            CC=clang SANITIZE=yes
+          echo '::endgroup::'
+
+          echo '::group::Build C++ console apps (clang+ASAN+LSAN+UBSAN)'
+          make -C src/c-lib -j "$(nproc)" app-cpp \
+            CC=clang SANITIZE=yes
+          ( cd src/c-lib && \
+            LD_LIBRARY_PATH=build \
+            build/gs1encoders-cpp-app.bin --version )
+
+          make -C src/c-lib -j "$(nproc)" app-cpp-static \
+            CC=clang SANITIZE=yes
+          ( cd src/c-lib && \
+            build/gs1encoders-cpp-static.bin --version )
+          echo '::endgroup::'
 
   ci-gcc:
 
@@ -66,16 +87,18 @@ jobs:
 
       - name: gcc CI
         run: |
-          # Load AI table from external Syntax Dictionary
+          echo '::group::C tests with external Syntax Dictionary (gcc+analyzer)'
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            make -C src/c-lib -j "$(nproc)" test \
+              CC=gcc ANALYZER=yes SLOW_TESTS=yes
+          echo '::endgroup::'
+
+          echo '::group::C tests with embedded AI table (gcc+analyzer)'
           make -C src/c-lib -j "$(nproc)" test \
             CC=gcc ANALYZER=yes SLOW_TESTS=yes
+          echo '::endgroup::'
 
-          # Re-run using the embedded AI table
-          rm src/c-lib/gs1-syntax-dictionary.txt
-          make -C src/c-lib -j "$(nproc)" test \
-            CC=gcc ANALYZER=yes SLOW_TESTS=yes
-          git checkout src/c-lib/gs1-syntax-dictionary.txt
-
+          echo '::group::Build shared lib and apps (gcc+analyzer)'
           make -C src/c-lib -j "$(nproc)" lib CC=gcc ANALYZER=yes
 
           make -C src/c-lib -j "$(nproc)" app CC=gcc ANALYZER=yes
@@ -87,6 +110,7 @@ jobs:
             CC=gcc ANALYZER=yes
           ( cd src/c-lib && \
             build/gs1encoders-static.bin --version )
+          echo '::endgroup::'
 
       - name: C++ wrapper tests
         run: |
@@ -98,6 +122,10 @@ jobs:
           ( cd src/c-lib && \
             LD_LIBRARY_PATH=build \
             build/gs1encoders-cpp-app.bin --version )
+
+          make -C src/c-lib -j "$(nproc)" app-cpp-static
+          ( cd src/c-lib && \
+            build/gs1encoders-cpp-static.bin --version )
 
   ci-valgrind:
 
@@ -114,19 +142,21 @@ jobs:
           sudo apt-get update
           sudo apt-get -y --no-install-recommends install valgrind
 
-          # Load AI table from external Syntax Dictionary
-          make -C src/c-lib -j "$(nproc)" test \
-            CC=gcc SLOW_TESTS=yes
-          valgrind --tool=memcheck \
-            --leak-check=full \
-            --show-leak-kinds=all \
-            --errors-for-leak-kinds=all \
-            --error-exitcode=1 \
-            --track-origins=yes \
-            -s src/c-lib/build-test/gs1encoders-test.bin
+          echo '::group::C tests under valgrind with external Syntax Dictionary'
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            make -C src/c-lib -j "$(nproc)" test \
+              CC=gcc SLOW_TESTS=yes
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            valgrind --tool=memcheck \
+              --leak-check=full \
+              --show-leak-kinds=all \
+              --errors-for-leak-kinds=all \
+              --error-exitcode=1 \
+              --track-origins=yes \
+              -s src/c-lib/build-test/gs1encoders-test.bin
+          echo '::endgroup::'
 
-          # Re-run using the embedded AI table
-          rm src/c-lib/gs1-syntax-dictionary.txt
+          echo '::group::C tests under valgrind with embedded AI table'
           make -C src/c-lib -j "$(nproc)" test \
             CC=gcc SLOW_TESTS=yes
           valgrind --tool=memcheck \
@@ -136,7 +166,19 @@ jobs:
             --error-exitcode=1 \
             --track-origins=yes \
             -s src/c-lib/build-test/gs1encoders-test.bin
-          git checkout src/c-lib/gs1-syntax-dictionary.txt
+          echo '::endgroup::'
+
+          echo '::group::C++ wrapper tests under valgrind'
+          make -C src/c-lib -j "$(nproc)" test-cpp
+          LD_LIBRARY_PATH=src/c-lib/build \
+            valgrind --tool=memcheck \
+              --leak-check=full \
+              --show-leak-kinds=all \
+              --errors-for-leak-kinds=all \
+              --error-exitcode=1 \
+              --track-origins=yes \
+              -s src/c-lib/build/gs1encoders-cpp-test.bin
+          echo '::endgroup::'
 
   ci-msan:
 
@@ -154,15 +196,16 @@ jobs:
           # For llvm-symbolizer and lld
           sudo apt-get -y --no-install-recommends install llvm lld
 
-          # Load AI table from external Syntax Dictionary
-          make -C src/c-lib -j "$(nproc)" MSAN=yes \
-            SLOW_TESTS=yes test
+          echo '::group::C tests with external Syntax Dictionary (clang+MSAN)'
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            make -C src/c-lib -j "$(nproc)" MSAN=yes \
+              SLOW_TESTS=yes test
+          echo '::endgroup::'
 
-          # Re-run using the embedded AI table
-          rm src/c-lib/gs1-syntax-dictionary.txt
+          echo '::group::C tests with embedded AI table (clang+MSAN)'
           make -C src/c-lib -j "$(nproc)" MSAN=yes \
             SLOW_TESTS=yes test
-          git checkout src/c-lib/gs1-syntax-dictionary.txt
+          echo '::endgroup::'
 
   ci-msvc:
 
@@ -179,31 +222,44 @@ jobs:
 
       - name: MSVC CI
         run: |
+          Write-Output '::group::MSBuild solution (Release|x64)'
           msbuild /t:Restore,Build `
             /p:Configuration=release `
             /p:Platform="x64" `
             /warnaserror src\gs1encoders.sln
+          Write-Output '::endgroup::'
 
-          # Load AI table from external Syntax Dictionary
-          copy src\c-lib\gs1-syntax-dictionary.txt .
+          Write-Output '::group::C tests with external Syntax Dictionary (MSVC)'
+          $env:GS1_TEST_SYNDICT = "$pwd\src\c-lib\gs1-syntax-dictionary.txt"
           src\c-lib\build\test\x64\Release\gs1encoders-test.exe
-          src\c-lib\build\test-cpp\x64\Release\gs1encoders-cpp-test.exe
+          Write-Output '::endgroup::'
 
-          # Re-run using the embedded AI table
-          del gs1-syntax-dictionary.txt
+          Write-Output '::group::C++ wrapper tests with external Syntax Dictionary (MSVC)'
+          src\c-lib\build\test-cpp\x64\Release\gs1encoders-cpp-test.exe
+          Write-Output '::endgroup::'
+
+          Write-Output '::group::C tests with embedded AI table (MSVC)'
+          $env:GS1_TEST_SYNDICT = ""
           src\c-lib\build\test\x64\Release\gs1encoders-test.exe
-          src\c-lib\build\test-cpp\x64\Release\gs1encoders-cpp-test.exe
-          copy src\c-lib\gs1-syntax-dictionary.txt .
+          Write-Output '::endgroup::'
 
+          Write-Output '::group::C++ wrapper tests with embedded AI table (MSVC)'
+          src\c-lib\build\test-cpp\x64\Release\gs1encoders-cpp-test.exe
+          Write-Output '::endgroup::'
+
+          Write-Output '::group::App version checks (MSVC)'
           src\c-lib\build\console-app\x64\Release\gs1encoders-app.exe `
             --version
           src\c-lib\build\console-app-cpp\x64\Release\gs1encoders-cpp-app.exe `
             --version
           src\dotnet-app\bin\Release\net8.0-windows\gs1encoders-dotnet-app.exe `
             --version
+          Write-Output '::endgroup::'
 
+          Write-Output '::group::.NET wrapper tests (MSVC)'
           dotnet test src\dotnet-test\gs1encoders-dotnet-test.csproj `
             --no-build --configuration release
+          Write-Output '::endgroup::'
 
   ci-macos:
 
@@ -217,18 +273,20 @@ jobs:
 
       - name: clang CI
         run: |
-          # Load AI table from external Syntax Dictionary
+          echo '::group::C tests with external Syntax Dictionary (macOS clang+ASAN+UBSAN)'
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            make -C src/c-lib \
+              -j "$(sysctl -n hw.logicalcpu)" \
+              test SANITIZE=yes SLOW_TESTS=yes
+          echo '::endgroup::'
+
+          echo '::group::C tests with embedded AI table (macOS clang+ASAN+UBSAN)'
           make -C src/c-lib \
             -j "$(sysctl -n hw.logicalcpu)" \
             test SANITIZE=yes SLOW_TESTS=yes
+          echo '::endgroup::'
 
-          # Re-run using the embedded AI table
-          rm src/c-lib/gs1-syntax-dictionary.txt
-          make -C src/c-lib \
-            -j "$(sysctl -n hw.logicalcpu)" \
-            test SANITIZE=yes SLOW_TESTS=yes
-          git checkout src/c-lib/gs1-syntax-dictionary.txt
-
+          echo '::group::Build shared lib and apps (macOS clang+ASAN+UBSAN)'
           make -C src/c-lib \
             -j "$(sysctl -n hw.logicalcpu)" \
             lib SANITIZE=yes
@@ -245,6 +303,28 @@ jobs:
             app-static SANITIZE=yes
           ( cd src/c-lib && \
             build/gs1encoders-static.bin --version )
+          echo '::endgroup::'
+
+          echo '::group::C++ wrapper tests (macOS clang+ASAN+UBSAN, no LSAN)'
+          make -C src/c-lib \
+            -j "$(sysctl -n hw.logicalcpu)" \
+            test-cpp SANITIZE=yes
+          echo '::endgroup::'
+
+          echo '::group::Build C++ console apps (macOS clang+ASAN+UBSAN, no LSAN)'
+          make -C src/c-lib \
+            -j "$(sysctl -n hw.logicalcpu)" \
+            app-cpp SANITIZE=yes
+          ( cd src/c-lib && \
+            DYLD_LIBRARY_PATH=build \
+            build/gs1encoders-cpp-app.bin --version )
+
+          make -C src/c-lib \
+            -j "$(sysctl -n hw.logicalcpu)" \
+            app-cpp-static SANITIZE=yes
+          ( cd src/c-lib && \
+            build/gs1encoders-cpp-static.bin --version )
+          echo '::endgroup::'
 
   ci-swift:
 
@@ -329,6 +409,7 @@ jobs:
               -DPRNT \
               -DSYMBOLOGY=gs1_encoder_sNONE \
               -DUNIT_TESTS \
+              -DGS1_ENCODERS_CUSTOM_HEAP_MANAGEMENT_H=test-heap.h \
               -DGS1_LINTER_ERR_STR_EN "$1"; \
               [[ $? = 0 ]] || false' _ {} \;
 
@@ -373,6 +454,100 @@ jobs:
             --suppress=missingIncludeSystem \
             --suppress=preprocessorErrorDirective:ai.h \
             --suppress=unusedFunction:gs1encoders.hpp .
+
+  ci-abi-check:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install ABI tools
+        run: |
+          sudo apt-get update
+          sudo apt-get -y --no-install-recommends install \
+            abi-compliance-checker abi-dumper
+
+      # LDFLAGS= drops -s (linker strip) so DWARF debug info needed by
+      # abi-dumper is preserved. The other LDFLAGS entries (--as-needed,
+      # -Bsymbolic-functions, -z relro/now) are hardening/binding flags
+      # that don't affect the exported ABI surface.
+
+      - name: Build and dump current ABI
+        run: |
+          make -C src/c-lib -j "$(nproc)" libshared LDFLAGS=
+          abi-dumper src/c-lib/build/libgs1encoders.so \
+            -o current.dump \
+            -lver "$(git describe --always --dirty)"
+
+      - name: Build and dump baseline ABI from latest release
+        run: |
+          # Fetch release tags from canonical upstream — fork clones don't
+          # mirror them by default.
+          git fetch --tags https://github.com/gs1/gs1-syntax-engine.git
+          BASELINE=$(git tag -l --sort=-v:refname \
+                     | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          echo "Baseline: $BASELINE"
+          git worktree add /tmp/baseline "$BASELINE"
+          make -C /tmp/baseline/src/c-lib -j "$(nproc)" libshared LDFLAGS=
+          abi-dumper /tmp/baseline/src/c-lib/build/libgs1encoders.so \
+            -o baseline.dump -lver "$BASELINE"
+
+      - name: Compare
+        run: |
+          abi-compliance-checker -l libgs1encoders \
+            -old baseline.dump -new current.dump
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: abi-compliance-report
+          path: compat_reports/
+          retention-days: 30
+
+  ci-coverage:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get -y --no-install-recommends install lcov
+
+      - name: Run coverage
+        run: |
+          make -C src/c-lib coverage
+          {
+            echo "## Coverage"
+            echo '```'
+            lcov --summary src/c-lib/build-coverage/coverage.info 2>&1 \
+              | grep -E '^  (lines|functions|branches)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce 100% line coverage
+        run: |
+          lcov --summary src/c-lib/build-coverage/coverage.info \
+            --fail-under-lines 100
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: src/c-lib/build-coverage/coverage-report/
+          retention-days: 30
 
   ci-java-linux:
 
@@ -701,10 +876,10 @@ jobs:
 
       - name: ZIP console application
         working-directory: >-
-          src/c-lib/build/console-app/x64/Release
+          src/c-lib/build/console-app-cpp/x64/Release
         run: |
           7z a gs1encoders-windows-console-app.zip `
-            gs1encoders-app.exe gs1encoders.dll `
+            gs1encoders-cpp-app.exe gs1encoders.dll `
             ../../../../gs1-syntax-dictionary.txt
 
       - name: Store Windows console app
@@ -712,7 +887,7 @@ jobs:
         with:
           name: windows-console-app
           path: "\
-            src/c-lib/build/console-app/\
+            src/c-lib/build/console-app-cpp/\
             x64/Release/\
             gs1encoders-windows-console-app.zip"
           retention-days: 1
@@ -793,14 +968,14 @@ jobs:
 
       - name: Linux release build
         run: |
-          make -C src/c-lib -j "$(nproc)" CC=clang
-          src/c-lib/build/gs1encoders-static.bin \
+          make -C src/c-lib -j "$(nproc)" CC=clang app-cpp-static
+          src/c-lib/build/gs1encoders-cpp-static.bin \
             --version
           cp src/c-lib/gs1-syntax-dictionary.txt \
             src/c-lib/build/
           cd src/c-lib/build
           tar cvzf gs1encoders-linux-app.tgz \
-            gs1encoders-static.bin \
+            gs1encoders-cpp-static.bin \
             gs1-syntax-dictionary.txt
 
       - name: Store Linux build

@@ -30,6 +30,7 @@
 #include "enc-private.h"
 #include "debug.h"
 #include "ai.h"
+#include "syn.h"
 #include "dl.h"
 #include "tr.h"
 
@@ -120,19 +121,21 @@ redo:
 	 *  Clear the current AI table
 	 *
 	 */
-	if (ctx->aiTable && ctx->aiTableIsDynamic)
+	if (ctx->aiTable && ctx->aiTableIsDynamic) {
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+		gs1_freeSyntaxDictionaryEntries(ctx, ctx->aiTable);
+#endif
 		GS1_ENCODERS_FREE(ctx->aiTable);
+	}
 
 	/*
 	 *  Set the given AI table and populate the various additional
 	 *  structures with information extracted from the AI table.
 	 *
 	 */
-	ctx->aiTableIsDynamic = true;
 	if (!aiTable) {
 #ifndef EXCLUDE_EMBEDDED_AI_TABLE
 		aiTable = embedded_ai_table;
-		ctx->aiTableIsDynamic = false;
 #else
 		strcpy(ctx->errMsg, "Embedded AI table is not available");
 		return false;
@@ -140,6 +143,11 @@ redo:
 	}
 
 	ctx->aiTable = aiTable;
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
+	ctx->aiTableIsDynamic = (aiTable != embedded_ai_table);
+#else
+	ctx->aiTableIsDynamic = true;
+#endif
 
 	ctx->aiTableEntries = 0;
 	for (e = ctx->aiTable; *e->ai; e++)
@@ -207,20 +215,10 @@ static inline __ATTR_PURE uint8_t valLengthByPrefix(const char* const ai) {
  */
 static const struct aiEntry unknownAI =
 	AI_ENTRY( ""    , DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
-static const struct aiEntry unknownAI2 =
-	AI_ENTRY( "XX"  , DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI3 =
 	AI_ENTRY( "XXX" , DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI4 =
 	AI_ENTRY( "XXXX", DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
-static const struct aiEntry unknownAI2fixed2 =
-	AI_ENTRY( "XX"  , NO_FNC1, XX_DATA_ATTR, X,2,2,MAN,_,_,_,   __, __, __, __, "", "UNKNOWN" );
-static const struct aiEntry unknownAI2fixed14 =
-	AI_ENTRY( "XX"  , NO_FNC1, XX_DATA_ATTR, X,14,14,MAN,_,_,_, __, __, __, __, "", "UNKNOWN" );
-static const struct aiEntry unknownAI2fixed16 =
-	AI_ENTRY( "XX"  , NO_FNC1, XX_DATA_ATTR, X,16,16,MAN,_,_,_, __, __, __, __, "", "UNKNOWN" );
-static const struct aiEntry unknownAI2fixed18 =
-	AI_ENTRY( "XX"  , NO_FNC1, XX_DATA_ATTR, X,18,18,MAN,_,_,_, __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI3fixed13 =
 	AI_ENTRY( "XXX" , NO_FNC1, XX_DATA_ATTR, X,13,13,MAN,_,_,_, __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI4fixed6 =
@@ -321,15 +319,11 @@ __ATTR_PURE const struct aiEntry* gs1_lookupAIentry(const gs1_encoder* const ctx
 	if (aiLenByPrefix != 0 && !gs1_allDigits((uint8_t *)ai, aiLenByPrefix))
 		return NULL;
 
+	// 2-digit AIs equal their prefix; matching needles resolve to FOUND or INVALID at bsearch, never NOT_FOUND
+	assert(aiLenByPrefix != 2);
+
 	// Return unknownAI indicator for corresponding AI length
-	if (aiLenByPrefix == 2) {
-		uint8_t valLenByPrefix = valLengthByPrefix(ai);
-		if (valLenByPrefix == VL) return &unknownAI2;
-		if (valLenByPrefix ==  2) return &unknownAI2fixed2;
-		if (valLenByPrefix == 14) return &unknownAI2fixed14;
-		if (valLenByPrefix == 16) return &unknownAI2fixed16;
-		if (valLenByPrefix == 18) return &unknownAI2fixed18;
-	} else if (aiLenByPrefix == 3) {
+	if (aiLenByPrefix == 3) {
 		uint8_t valLenByPrefix = valLengthByPrefix(ai);
 		if (valLenByPrefix == VL) return &unknownAI3;
 		if (valLenByPrefix == 13) return &unknownAI3fixed13;
@@ -535,7 +529,7 @@ static size_t validate_ai_val(gs1_encoder* const ctx, const char* const ai, cons
 			case cset_X: cset_linter = gs1_lint_cset82; break;
 			case cset_Y: cset_linter = gs1_lint_cset39; break;
 			case cset_Z: cset_linter = gs1_lint_cset64; break;
-			default: cset_linter = NULL; break;
+			default: cset_linter = NULL; break;  // LCOV_EXCL_LINE: enum is closed; default is defensive (caught by the assert below)
 		}
 		assert(cset_linter);
 		l = &cset_linter;
@@ -1071,7 +1065,7 @@ void gs1_loadValidationTable(gs1_encoder* const ctx) {
 void test_ai_lookupAIentry(void) {
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(strcmp(gs1_lookupAIentry(ctx, "01",     2)->ai, "01") == 0);		// Exact lookup, data following
@@ -1148,7 +1142,7 @@ void test_ai_existsInAIdata(void) {
 	static const char* dataStr2 = "(98)DEF(97)GHI(96)JKL(95)MNO";
 	static const char* dataStr3 = "(01)12345678901231(235)ABC123(8002)123456";
 
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 #define test_existsInAIdata(s, d, n, i, e) do {					\
@@ -1204,7 +1198,7 @@ void test_ai_existsInAIdata(void) {
 void test_ai_checkAIlengthByPrefix(void) {
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	TEST_CHECK(aiLengthByPrefix(ctx, "00") == 2);
@@ -1262,7 +1256,7 @@ void test_ai_AItableVsPrefixLength(void) {
 	const struct aiEntry *entry;
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	for (entry = ctx->aiTable; *entry->ai; entry++) {
@@ -1279,7 +1273,7 @@ void test_ai_AItableVsIsFNC1required(void) {
 	const struct aiEntry *entry;
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	for (entry = ctx->aiTable; *entry->ai; entry++) {
@@ -1320,7 +1314,7 @@ static void do_test_parseAIdata(gs1_encoder* const ctx, const char* const file, 
 void test_ai_parseAIdata(void) {
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 #define test_parseAIdata(s, d, e) do {					\
@@ -1582,7 +1576,7 @@ void test_ai_linters(void) {
 	};
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 	for (i = 0; i < SIZEOF_ARRAY(tests); i++)
@@ -1608,7 +1602,7 @@ static void do_test_processAIdata(gs1_encoder* const ctx, const char* const file
 void test_ai_processAIdata(void) {
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 #define test_processAIdata(s, d) do {					\
@@ -1808,7 +1802,7 @@ static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, 
 void test_ai_validateAIs(void) {
 
 	gs1_encoder* ctx;
-	TEST_ASSERT((ctx = GS1_ENCODER_UNIT_TEST_INIT()) != NULL);
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
 #define test_validateAIs(s, f, d) do {					\
