@@ -2,4 +2,4 @@
 # GS1 Digital Link URI path shortname for AI 21 (Serial Number)
 ignore-words-list = ser
 # Skip vendored, generated, third-party, and symlinked files
-skip = src/c-lib/syntax,docs,src/c-lib/aitable.*,src/c-lib/build*,src/c-lib/corpus-*,maintenance/docker/*/build,node_modules,src/swift/.build,*/acutest.h,*/corpus-*,*.svg
+skip = src/c-lib/syntax,docs,src/c-lib/aitable.*,src/c-lib/build*,src/c-lib/corpus-*,src/c-lib/makefile.vcwin32,maintenance/docker/*/build,node_modules,src/swift/.build,*/acutest.h,*/corpus-*,*.svg
