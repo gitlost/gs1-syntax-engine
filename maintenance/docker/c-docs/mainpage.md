@@ -51,8 +51,8 @@ these buffers.
 
 This documentation set covers two equivalent surfaces:
 
-  * **@ref capi "C API"** — the canonical interface, declared in `gs1encoders.h`.
-    Free functions operating on an opaque ::gs1_encoder context. Pair with the
+  * **@ref capi "C API"** — declared in `gs1encoders.h`. Free functions
+    operating on an opaque ::gs1_encoder context. Pair with the
     ::gs1_encoder_init_opts_t structure for explicit initialisation control.
     Suitable for C and for C++ code that prefers to talk to the C ABI directly.
 
@@ -60,9 +60,8 @@ This documentation set covers two equivalent surfaces:
     later), declared in `gs1encoders.hpp` and rooted in the @ref gs1encoders
     namespace. Provides a fluent gs1encoders::InitOpts builder, idiomatic STL
     types (`std::string`, `std::vector`, `std::optional`) and a typed exception
-    hierarchy. The wrapper introduces no runtime overhead beyond the inline
-    calls into the underlying C library and ships in the same package as the
-    C header, so no extra dependency is required.
+    hierarchy. The wrapper compiles inline with no runtime overhead over the
+    C API, and is distributed in the same package.
 
 The two surfaces are interchangeable for any operation. The minimal example
 below shows the same task — encode a bracketed AI element string as a GS1
@@ -83,9 +82,8 @@ gs.set_ai_data_str("(01)09521234543213(99)TESTING123");
 std::cout << gs.get_dl_uri("https://example.com") << "\n";
 \endcode
 
-Pick the API that fits the surrounding code; the rest of this page uses C in
-its examples, and the equivalent C++ method names are spelled out in the
-@ref cppapi reference.
+Pick the API that fits the surrounding code; the examples throughout this
+page are given in both C and C++.
 
 ### Quick Start {#quick-start}
 
@@ -109,27 +107,40 @@ Build using Visual Studio or from a Developer Command Prompt:
 
 This generates the library in `src\c-lib\build\library\x64\Release\gs1encoders.dll`.
 
-#### Running the example application
+#### Running the examples
 
-After building, you can test the library by running the interactive console application:
+After building, you can exercise the library in two ways: a non-interactive
+**C** program that walks through the API (`example.c`), and an interactive
+**C++** console application (`gs1encoders-cpp-app.cpp`) that provides a menu for
+testing different input formats and features.
 
 **On Unix/macOS:**
 
-    make -C src/c-lib -j `nproc` app
-    LD_LIBRARY_PATH=src/c-lib/build src/c-lib/build/gs1encoders.bin
+C API example:
+
+    make -C src/c-lib -j `nproc` example
+    LD_LIBRARY_PATH=src/c-lib/build src/c-lib/build/gs1encoders-example.bin
+
+C++ console application:
+
+    make -C src/c-lib -j `nproc` app-cpp
+    LD_LIBRARY_PATH=src/c-lib/build src/c-lib/build/gs1encoders-cpp-app.bin
 
 **On Windows:**
 
-    msbuild src\gs1encoders.sln /t:gs1encoders-app /p:Configuration=Release /p:Platform=x64
-    src\c-lib\build\bin\x64\Release\gs1encoders-app.exe
+The C++ console application is built as part of the solution:
 
-The example application provides an interactive menu for testing different input formats and features.
+    msbuild src\gs1encoders.sln /t:gs1encoders-cpp-app /p:Configuration=Release /p:Platform=x64
+    src\c-lib\build\console-app-cpp\x64\Release\gs1encoders-cpp-app.exe
+
+The C example has no Visual Studio project; compile it directly against the
+library as shown in the *Using in your own C/C++ project* section below.
 
 #### Using in your own C/C++ project
 
 To use the library in your C/C++ project you must:
 
-  1. Include `gs1encoders.h` in your source files
+  1. Include `gs1encoders.h` (C) or `gs1encoders.hpp` (C++) in your source files
   2. Link against the library (`libgs1encoders.so`, `libgs1encoders.a`, `gs1encoders.dll`, or `gs1encoders.lib`)
 
 **Note:** On Windows, `gs1encoders.dll` requires the
@@ -184,13 +195,23 @@ int main() {
 \endcode
 
 To load an external GS1 Syntax Dictionary file instead of using the embedded
-AI table, populate a @ref gs1_encoder_init_opts_t and pass it to
-gs1_encoder_init_ex(). The fields are:
+AI table, supply initialisation options.
 
-  * @ref gs1_encoder_init_opts::syntaxDictionary — path to a Syntax Dictionary file. `NULL` (default) uses the embedded AI table.
+In C, populate a @ref gs1_encoder_init_opts_t and pass it to
+gs1_encoder_init_ex():
+
+  * @ref gs1_encoder_init_opts::syntaxDictionary — path to a Syntax Dictionary file; unset (the default) uses the embedded AI table.
   * @ref gs1_encoder_init_flags "gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR" — fall back to the embedded AI table if the Syntax Dictionary cannot be loaded.
   * @ref gs1_encoder_init_flags "gs1_encoder_iNO_EMBEDDED" — refuse to use the embedded AI table (initialisation fails if no other AI table can be loaded).
   * @ref gs1_encoder_init_opts::status and @ref gs1_encoder_init_opts::msgBuf — receive the structured initialisation outcome and any error or warning message.
+
+In C++, construct the gs1encoders::GS1Encoder from a gs1encoders::InitOpts
+builder:
+
+  * gs1encoders::InitOpts::syntax_dictionary() — path to a Syntax Dictionary file; unset (the default) uses the embedded AI table.
+  * gs1encoders::InitOpts::fallback_on_syndict_error() — fall back to the embedded AI table if the Syntax Dictionary cannot be loaded.
+  * gs1encoders::InitOpts::no_embedded() — refuse to use the embedded AI table (initialisation fails if no other AI table can be loaded).
+  * initialisation failure throws gs1encoders::GS1EncoderGeneralException; any fallback warning is returned by gs1encoders::GS1Encoder::init_fallback_warning().
 
 The following inverse example parses a GS1 Digital Link URI and reports the
 extracted AI data, loading the Syntax Dictionary from a host filesystem path
@@ -274,11 +295,6 @@ int main() {
 }
 \endcode
 
-**Note:** Each `gs1_encoder` instance allocates native resources. The C
-caller must release them with gs1_encoder_free(); in C++ the encoder
-object's destructor handles this automatically when the holding scope
-ends or the holder is destroyed.
-
 **On Unix/macOS:**
 
 Compile and link.
@@ -317,28 +333,34 @@ Run (same for both; ensure `gs1encoders.dll` is in the same directory or on PATH
 The following are examples of how to use the library.
 
 \note
-Using the library always begins by initialising the library with
-@ref gs1_encoder_init_ex() and finishes by releasing the
-library with @ref gs1_encoder_free().
-
-\note
+**C** — Using the library begins by initialising with
+@ref gs1_encoder_init_ex() and ends by releasing with @ref gs1_encoder_free().
 Unless otherwise specified, the getter functions return pointers to
 per-instance storage managed by this library and therefore must not be freed
-by the user. If their content must persist following a subsequent call to
-the same instance of the library then they must be copied to a user-managed
-buffer.
+by the user; if their content must persist following a subsequent call to the
+same instance then it must be copied to a user-managed buffer. Most of the
+setter and action functions return a boolean indicating whether the function
+was successful and write an error message that can be accessed with
+@ref gs1_encoder_getErrMsg() in the event of failure; production code should
+check the return value and, where relevant, do something appropriate which
+might include rendering the error message to the user.
 
 \note
-Most of the setter and action functions of this library return a boolean
-indicating whether the function was successful and write an error message
-that can be accessed with @ref gs1_encoder_getErrMsg() in the event of failure.
-Production code should check the output of the functions and where relevant
-do something appropriate which might include rendering the error message to
-the user. Error message string are provided in the English language in a
-single file that can be replaced at compile time.
+**C++** — Using the library begins by constructing a gs1encoders::GS1Encoder,
+whose destructor releases the native resources automatically when it goes out
+of scope. The getter methods return owning `std::string` and `std::vector`
+copies, so there are no lifetime caveats on returned values. The setter and
+action methods report failure by throwing a gs1encoders::GS1EncoderException
+(whose `what()` carries the error message), so the equivalent handling is a
+`try`/`catch`.
 
-Refer to the example console application (`gs1encoders-app.c`) for a
-comprehensive example of how to use this library.
+\note
+Error message strings are provided in the English language in a single file
+that can be replaced at compile time.
+
+Refer to the bundled examples — the C program `example.c` and the interactive
+C++ console application `gs1encoders-cpp-app.cpp` — for complete, working
+demonstrations of how to use this library.
 
 
 #### GS1 AI data validation and extraction (including GS1 Digital Link)
@@ -633,3 +655,12 @@ void my_free(void *p) {
 
 ...
 \endcode
+
+\note
+These routines configure the allocations made internally by the C library and
+are selected when that library is built; the setting applies identically
+whether you call the C API or the C++ wrapper. The routines must have C
+linkage — if you implement them in a C++ translation unit, declare them
+`extern "C"`. Note that these macros affect only the C library's internal
+allocations; they do not intercept allocations made by the C++ standard-library
+types that the wrapper returns.
