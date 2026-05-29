@@ -90,11 +90,13 @@ TEST_LIST = {
      */
 #ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
     { "syn_parseSyntaxDictionaryEntry", test_syn_parseSyntaxDictionaryEntry },
+    { "syn_attrTemplateForm", test_syn_attrTemplateForm },
     { "syn_allocFailures", test_syn_allocFailures },
     { "syn_capacityOverflow", test_syn_capacityOverflow },
     { "syn_strdupFailures", test_syn_strdupFailures },
     { "syn_lineTooLong", test_syn_lineTooLong },
     { "syn_nulLeadingLine", test_syn_nulLeadingLine },
+    { "syn_dictionaryOrder", test_syn_dictionaryOrder },
 #endif
 
 
@@ -111,6 +113,7 @@ TEST_LIST = {
     { "ai_linters", test_ai_linters },
     { "ai_errMarkup", test_ai_errMarkup },
     { "ai_gs1_processAIdata", test_ai_processAIdata },
+    { "ai_predefinedLength", test_ai_predefinedLength },
     { "ai_validateAIs", test_ai_validateAIs },
 
 
@@ -124,6 +127,7 @@ TEST_LIST = {
     { "dl_URIescape", test_dl_URIescape },
     { "dl_generateDLuri", test_dl_generateDLuri },
     { "dl_allocFailures", test_dl_allocFailures },
+    { "dl_keyQualifierLimit", test_dl_keyQualifierLimit },
 
 
     /*

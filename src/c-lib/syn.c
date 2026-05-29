@@ -139,6 +139,25 @@ fail:
 
 }
 
+// Validate that an attribute value references only well-formed AIs: 1+ leading
+// digits optionally followed by trailing 'n' wildcards (e.g. "310n"), matching
+// the form the runtime's prefix-based template matching expects
+static bool validAttrAIrefs(const char* val, const char* seps) {
+	for (;;) {
+		size_t n = strcspn(val, seps);
+		size_t leading_digits;
+		if (n < MIN_AI_LEN || n > MAX_AI_LEN)
+			return false;
+		leading_digits = strspn(val, "0123456789");
+		if (leading_digits < 1 || leading_digits + strspn(val + leading_digits, "n") != n)
+			return false;
+		val += n;
+		if (*val == '\0')
+			return true;
+		val++;					// Skip separator
+	}
+}
+
 int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, const struct aiEntry* const sd, struct aiEntry** const entry, const uint16_t cap) {
 
 	const struct aiEntry *lastEntry;
@@ -214,6 +233,11 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 
 	}
 
+	// The Syntax Dictionary is sorted, so each AI must lexically exceed its
+	// predecessor; this also rejects duplicates and underpins the binary search
+	if (*entry != sd && strcmp((*entry)->ai, (*entry)[-1].ai) <= 0)
+		error(AIS_MUST_BE_IN_ASCENDING_ORDER);
+
 	token = strtok_r(NULL, " \t", &saveptr);
 	if (!token)
 		error(TRUNCATED_AFTER_AI);
@@ -270,6 +294,15 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 			error(MANDATORY_COMPONENT_CANNOT_FOLLOW_OPTIONAL_COMPONENTS);
 	}
 
+	// '*' means no FNC1 separator; predefined length must therefore be known.
+	// Exempt AIs whose value length is derived from the value (e.g. AI 23).
+	if ((*entry)->fnc1 == NO_FNC1 &&
+	    !((*entry)->ailen == 2 && gs1_aiPrefixHasDerivedLength((*entry)->ai)))
+		for (part = 0; part < numparts; part++)
+			if ((*entry)->parts[part].min != (*entry)->parts[part].max ||
+			    (*entry)->parts[part].opt == OPT)
+				error(NO_FNC1_AI_MUST_BE_PREDEFINED_LENGTH);
+
 	// Read the key/value attributes until the title delimiter
 	p = buf;
 	while (token && strcmp(token, "#") != 0) {
@@ -292,6 +325,19 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 
 			if (*(q+1) == '\0')
 				error(ATTRIBUTE_VALUE_REQUIRED_ON_RHS_OF_ASSIGNMENT);
+
+			// ex=, req= and dlpkey= reference AIs, which must be well-formed
+			// (separators differ: ex by ',', req by ',' and '+', dlpkey by ',' and '|')
+			if (q-token == 2 && memcmp(token, "ex", 2) == 0) {
+				if (!validAttrAIrefs(q+1, ","))
+					error(ATTRIBUTE_AI_IS_NOT_WELL_FORMED);
+			} else if (q-token == 3 && memcmp(token, "req", 3) == 0) {
+				if (!validAttrAIrefs(q+1, ",+"))
+					error(ATTRIBUTE_AI_IS_NOT_WELL_FORMED);
+			} else if (q-token == 6 && memcmp(token, "dlpkey", 6) == 0) {
+				if (!validAttrAIrefs(q+1, ",|"))
+					error(ATTRIBUTE_AI_IS_NOT_WELL_FORMED);
+			}
 
 		} else {					// e.g. dlpkey
 
@@ -380,10 +426,9 @@ fail:
 
 }
 
-struct aiEntry* gs1_loadSyntaxDictionary(gs1_encoder* const ctx, const char* const fname) {
+struct aiEntry* gs1_loadSyntaxDictionaryFromFile(gs1_encoder* const ctx, FILE* const fp) {
 
 	const uint16_t cap = AI_TABLE_CAPACITY;
-	FILE *fp = NULL;
 	char buf[MAX_SD_ENTRY_LEN + 2];		// fgets includes "\n\0"
 	size_t linenum;
 
@@ -396,10 +441,6 @@ struct aiEntry* gs1_loadSyntaxDictionary(gs1_encoder* const ctx, const char* con
 	sd[0].ai[0] = '\0';
 	sd[0].attrs = NULL;
 	sd[0].title = NULL;
-
-	fp = fopen(fname, "r");
-	if (fp == NULL)
-		error_v(CANNOT_READ_FILE, fname);
 
 	pos = sd;
 	linenum = 1;
@@ -419,15 +460,32 @@ struct aiEntry* gs1_loadSyntaxDictionary(gs1_encoder* const ctx, const char* con
 		linenum++;
 	}
 
-	fclose(fp);
-
 	return sd;
 
 fail:
-	if (fp) fclose(fp);
 	if (sd) gs1_freeSyntaxDictionaryEntries(ctx, sd);
 	GS1_ENCODERS_FREE(sd);
 	return NULL;
+
+}
+
+
+struct aiEntry* gs1_loadSyntaxDictionary(gs1_encoder* const ctx, const char* const fname) {
+
+	FILE *fp;
+	struct aiEntry *sd;
+
+	fp = fopen(fname, "r");
+	if (fp == NULL) {
+		SET_ERR_V(CANNOT_READ_FILE, fname);
+		return NULL;
+	}
+
+	sd = gs1_loadSyntaxDictionaryFromFile(ctx, fp);
+
+	fclose(fp);
+
+	return sd;
 
 }
 
@@ -814,7 +872,38 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Attributes too long: cumulative attributes exceed MAX_AI_ATTR_LEN + 2 buffer
 	 *
 	 */
-	{ false, "90  X5  req=aaaaaaaaaa req=bbbbbbbbbb req=cccccccccc req=dddddddddd req=eeeeeeeeee", {
+	{ false, "90  X5  req=01 req=02 req=03 req=04 req=05 req=06 req=07 req=08 req=09 req=10", {
+		AI_ENTRY_TERMINATOR
+	} },
+
+	/*
+	 *  Attribute AI references must be well-formed AIs (templates permitted)
+	 *
+	 */
+	{ false, "01  N14,csum  ex=0",          { AI_ENTRY_TERMINATOR } },	// AI too short
+	{ false, "01  N14,csum  req=0",         { AI_ENTRY_TERMINATOR } },	// AI too short
+	{ false, "01  N14,csum  dlpkey=1",      { AI_ENTRY_TERMINATOR } },	// AI too short
+	{ false, "01  N14,csum  ex=12345",      { AI_ENTRY_TERMINATOR } },	// AI too long
+	{ false, "01  N14,csum  dlpkey=10,,21", { AI_ENTRY_TERMINATOR } },	// Empty AI
+	{ true,  "3900  ?  N4  ex=39nn", {					// Template permitted
+		AI_ENTRY("3900", DO_FNC1, DL_DATA_ATTR, N,4,4,MAN,_,_,_, __, __, __, __, "ex=39nn", ""),
+		AI_ENTRY_TERMINATOR
+	} },
+
+	/*
+	 *  '*' (NO_FNC1) requires a predefined length: all components fixed and
+	 *  mandatory, unless the AI's length is computed by a formula (e.g. AI 23)
+	 *
+	 */
+	{ false, "90  *  X..30",          { AI_ENTRY_TERMINATOR } },		// Variable final
+	{ false, "90  *  X5  X..30",      { AI_ENTRY_TERMINATOR } },		// Variable final
+	{ false, "90  *  [X5]",           { AI_ENTRY_TERMINATOR } },		// Optional
+	{ true,  "90  *  X5", {							// Fixed + mandatory: OK
+		AI_ENTRY("90", NO_FNC1, NO_DATA_ATTR, X,5,5,MAN,_,_,_, __, __, __, __, "", ""),
+		AI_ENTRY_TERMINATOR
+	} },
+	{ true,  "23  *  N..20", {						// Formula AI exempt
+		AI_ENTRY("23", NO_FNC1, NO_DATA_ATTR, N,1,20,MAN,_,_,_, __, __, __, __, "", ""),
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -837,6 +926,47 @@ void test_syn_parseSyntaxDictionaryEntry(void) {
 
 	for (i = 0; i < SIZEOF_ARRAY(tests_parse_sd_entry); i++)
 		test_parseSyntaxDictionaryEntry(ctx, tests_parse_sd_entry[i].sdEntry, tests_parse_sd_entry[i].aiEntries, tests_parse_sd_entry[i].expectSuccess);
+
+	gs1_encoder_free(ctx);
+
+}
+
+
+// Exhaustive d/n placement check for attribute AI references at lengths 2, 3
+// and 4: 1+ leading digits optionally followed by trailing 'n' wildcards
+void test_syn_attrTemplateForm(void) {
+
+	static const struct { const char* pat; bool valid; } cases[] = {
+		// Length 2 (4 placements; valid: dd, dn)
+		{ "01",   true  }, { "0n",   true  }, { "n0",   false }, { "nn",   false },
+		// Length 3 (8 placements; valid: ddd, ddn, dnn)
+		{ "012",  true  }, { "01n",  true  }, { "0n2",  false }, { "0nn",  true  },
+		{ "n01",  false }, { "n0n",  false }, { "nn0",  false }, { "nnn",  false },
+		// Length 4 (16 placements; valid: dddd, dddn, ddnn, dnnn)
+		{ "0123", true  }, { "012n", true  }, { "01n3", false }, { "01nn", true  },
+		{ "0n23", false }, { "0n2n", false }, { "0nn3", false }, { "0nnn", true  },
+		{ "n012", false }, { "n01n", false }, { "n0n2", false }, { "n0nn", false },
+		{ "nn01", false }, { "nn0n", false }, { "nnn0", false }, { "nnnn", false },
+	};
+	gs1_encoder* ctx;
+	struct aiEntry sd[2];
+	char buf[64];
+	size_t i;
+
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+	assert(ctx);
+
+	for (i = 0; i < SIZEOF_ARRAY(cases); i++) {
+		int numOut;
+		struct aiEntry *pos = sd;
+		snprintf(buf, sizeof(buf), "01  N14,csum  ex=%s", cases[i].pat);
+		numOut = parseSyntaxDictionaryEntry(ctx, buf, sd, &pos, 2);
+		TEST_CHECK((numOut > 0) == cases[i].valid);
+		TEST_MSG("pattern '%s' expected valid=%d got numOut=%d (err: %s)",
+			 cases[i].pat, cases[i].valid, numOut, ctx->errMsg);
+		if (numOut > 0)
+			gs1_freeSyntaxDictionaryEntries(ctx, sd);
+	}
 
 	gs1_encoder_free(ctx);
 
@@ -995,6 +1125,66 @@ void test_syn_nulLeadingLine(void) {
 		gs1_freeSyntaxDictionaryEntries(ctx, sd);
 		GS1_ENCODERS_FREE(sd);
 	}
+
+	remove(path);
+	gs1_encoder_free(ctx);
+
+}
+
+void test_syn_dictionaryOrder(void) {
+
+	const char* const path = "test-syndict-order.txt";
+	gs1_encoder* ctx;
+	FILE *fp;
+	struct aiEntry *sd;
+
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+	assert(ctx);
+
+	// Out-of-order AIs break the binary-search precondition and must be rejected
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) { gs1_encoder_free(ctx); return; }
+	fputs("99  X..30     # INTERNAL\n", fp);
+	fputs("01  N14,csum  # GTIN\n", fp);
+	fclose(fp);
+	sd = gs1_loadSyntaxDictionary(ctx, path);
+	TEST_CHECK(sd == NULL);
+	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
+
+	// Duplicate AIs must be rejected
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) { gs1_encoder_free(ctx); return; }
+	fputs("01  N14,csum  # GTIN\n", fp);
+	fputs("01  N14,csum  # GTIN duplicate\n", fp);
+	fclose(fp);
+	sd = gs1_loadSyntaxDictionary(ctx, path);
+	TEST_CHECK(sd == NULL);
+	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
+
+	// Overlapping ranges are duplicates once expanded and must be rejected
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) { gs1_encoder_free(ctx); return; }
+	fputs("3100-3105  N6  # NET WEIGHT\n", fp);
+	fputs("3103-3108  N6  # NET WEIGHT overlap\n", fp);
+	fclose(fp);
+	sd = gs1_loadSyntaxDictionary(ctx, path);
+	TEST_CHECK(sd == NULL);
+	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
+
+	// Strictly-ascending AIs (including a non-overlapping range) must load
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) { gs1_encoder_free(ctx); return; }
+	fputs("01         N14,csum  # GTIN\n", fp);
+	fputs("3100-3105  N6        # NET WEIGHT\n", fp);
+	fputs("99         X..30     # INTERNAL\n", fp);
+	fclose(fp);
+	sd = gs1_loadSyntaxDictionary(ctx, path);
+	TEST_CHECK(sd != NULL);
+	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
 
 	remove(path);
 	gs1_encoder_free(ctx);

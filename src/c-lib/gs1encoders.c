@@ -316,6 +316,10 @@ bool gs1_encoder_setValidateAIassociations(gs1_encoder* const ctx, const bool va
 bool gs1_encoder_getValidationEnabled(gs1_encoder* const ctx, const gs1_encoder_validations_t validation) {
 	assert(ctx);
 	reset_error(ctx);
+	if ((signed int)validation < 0 || validation >= gs1_encoder_vNUMVALIDATIONS) {  // Cast satisfies "unsigned enum < 0" checks
+		SET_ERR(UNKNOWN_VALIDATION);
+		return false;
+	}
 	return ctx->validationTable[validation].enabled;
 }
 bool gs1_encoder_setValidationEnabled(gs1_encoder* const ctx, const gs1_encoder_validations_t validation, const bool enabled) {
@@ -497,7 +501,9 @@ char* gs1_encoder_getAIdataStr(gs1_encoder* const ctx) {
 	for (i = 0; i < ctx->numAIs; i++) {
 		const struct aiValue *ai = &ctx->aiData[i];
 		if (ai->kind == aiValue_aival) {
-			len = (size_t)ai->ailen + 2;		// "(AI)"
+			// Worst case write for this AI: "(AI)" plus every value byte
+			// escaped as "\(", with the '<' leaving room for the trailing NUL
+			len = (size_t)ai->ailen + 2 + 2*(size_t)ai->vallen;
 			assert(len < sizeof(ctx->outStr) - (size_t)(p - ctx->outStr));
 			*p++ = '(';
 			memcpy(p, ai->ai, ai->ailen);
@@ -633,6 +639,9 @@ void gs1_encoder_copyHRI(gs1_encoder* const ctx, void* const buf, const size_t m
 	assert(ctx);
 	reset_error(ctx);
 
+	if (max == 0)		// No room even for a terminating NUL
+		return;
+
 	numhri = gs1_encoder_getHRI(ctx, &hri);
 
 	p = buf;
@@ -716,6 +725,9 @@ void gs1_encoder_copyDLignoredQueryParams(gs1_encoder* const ctx, void* const bu
 
 	assert(ctx);
 	reset_error(ctx);
+
+	if (max == 0)		// No room even for a terminating NUL
+		return;
 
 	numqp = gs1_encoder_getDLignoredQueryParams(ctx, &qp);
 
@@ -1266,6 +1278,11 @@ void test_api_validations(void) {
 	TEST_CHECK(gs1_encoder_getValidationEnabled(ctx, gs1_encoder_vREPEATED_AIS));		// Default
 	TEST_CHECK(!gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vREPEATED_AIS, false));
 
+	// Out-of-range index must be rejected by both setter and getter, not indexed
+	TEST_CHECK(!gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vNUMVALIDATIONS, true));
+	TEST_CHECK(!gs1_encoder_getValidationEnabled(ctx, gs1_encoder_vNUMVALIDATIONS));
+	TEST_CHECK(strlen(gs1_encoder_getErrMsg(ctx)) > 0);					// Error reported
+
 	gs1_encoder_free(ctx);
 
 }
@@ -1691,6 +1708,7 @@ void test_api_getAIdataStr(void) {
 
 	gs1_encoder* ctx;
 	char *out;
+	char buf[256];
 
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
@@ -1706,6 +1724,17 @@ void test_api_getAIdataStr(void) {
 	TEST_ASSERT((out = gs1_encoder_getAIdataStr(ctx)) != NULL);
 	assert(out);
 	TEST_CHECK(strcmp(out, "(01)12312312312333(10)ABC123") == 0);
+
+	// (235) X..28 FNC1-required after a NO_FNC1 AI: no ^ before (235), ^ before (10)
+	TEST_ASSERT(gs1_encoder_setDataStr(ctx, "^0112312312312333235XYZ^10BATCH"));
+	TEST_ASSERT((out = gs1_encoder_getAIdataStr(ctx)) != NULL);
+	assert(out);
+	TEST_CHECK(strcmp(out, "(01)12312312312333(235)XYZ(10)BATCH") == 0);
+
+	// (235): bracketed input round-trips to the expected ^-form via getDataStr
+	strcpy(buf, "(01)12312312312333(235)XYZ(10)BATCH");
+	TEST_ASSERT(gs1_encoder_setAIdataStr(ctx, buf));
+	TEST_CHECK(strcmp(gs1_encoder_getDataStr(ctx), "^0112312312312333235XYZ^10BATCH") == 0);
 
 	// Escape data "(" characters
 	TEST_ASSERT(gs1_encoder_setDataStr(ctx, "^011231231231233310ABC(123"));
@@ -1750,6 +1779,14 @@ void test_api_getScanData(void) {
 	TEST_ASSERT((out = gs1_encoder_getScanData(ctx)) != NULL);
 	assert(out);
 	TEST_CHECK(strcmp(out, "]e0011231231231233310ABC123" "\x1D" "1199122598COMPOSITE" "\x1D" "97XYZ") == 0);
+
+	// (235) X..28 emitted between a NO_FNC1 AI and a DO_FNC1 AI; GS appears
+	// only after (235), not between (01) and (235)
+	TEST_ASSERT(gs1_encoder_setSym(ctx, gs1_encoder_sGS1_128_CCA));
+	TEST_ASSERT(gs1_encoder_setDataStr(ctx, "^0112312312312333235XYZ^10BATCH"));
+	TEST_ASSERT((out = gs1_encoder_getScanData(ctx)) != NULL);
+	assert(out);
+	TEST_CHECK(strcmp(out, "]C10112312312312333235XYZ" "\x1D" "10BATCH") == 0);
 
 	gs1_encoder_free(ctx);
 
@@ -1825,6 +1862,15 @@ void test_api_getHRI(void) {
 	assert(hri);
 	TEST_CHECK(strcmp(hri[0], "(01) 12312312312333") == 0);
 	TEST_CHECK(strcmp(hri[1], "(10) ABC123") == 0);
+
+	// HRI for (235) X..28 FNC1-required
+	TEST_ASSERT(gs1_encoder_setDataStr(ctx, "^0112312312312333235XYZ^10BATCH"));
+	TEST_ASSERT((numAIs = gs1_encoder_getHRI(ctx, &hri)) == 3);
+	TEST_ASSERT(hri != NULL);
+	assert(hri);
+	TEST_CHECK(strcmp(hri[0], "(01) 12312312312333") == 0);
+	TEST_CHECK(strcmp(hri[1], "(235) XYZ") == 0);
+	TEST_CHECK(strcmp(hri[2], "(10) BATCH") == 0);
 
 	// HRI from composite, raw AI data
 	TEST_ASSERT(gs1_encoder_setDataStr(ctx, "^011231231231233310ABC123|^99COMPOSITE"));
@@ -1960,6 +2006,11 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 	gs1_encoder_copyHRI(ctx, (void*)buf, needed - 1);
 	TEST_CHECK(buf[0] == '\0');
 
+	// max == 0 has no room even for a NUL, so nothing must be written
+	buf[0] = 'X';
+	gs1_encoder_copyHRI(ctx, (void*)buf, 0);
+	TEST_CHECK(buf[0] == 'X');
+
 	gs1_encoder_free(ctx);
 
 DIAG_POP
@@ -2054,8 +2105,13 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 	TEST_CHECK(strlen(buf) == needed - 1);
 
 	// Check buffer too short returns empty string
-	gs1_encoder_copyHRI(ctx, (void*)buf, needed - 1);
+	gs1_encoder_copyDLignoredQueryParams(ctx, (void*)buf, needed - 1);
 	TEST_CHECK(buf[0] == '\0');
+
+	// max == 0 has no room even for a NUL, so nothing must be written
+	buf[0] = 'X';
+	gs1_encoder_copyDLignoredQueryParams(ctx, (void*)buf, 0);
+	TEST_CHECK(buf[0] == 'X');
 
 	gs1_encoder_free(ctx);
 

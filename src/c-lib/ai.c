@@ -209,6 +209,24 @@ static inline __ATTR_PURE uint8_t valLengthByPrefix(const char* const ai) {
 
 
 /*
+ * Retired AI (23) derives pre-defined length based on leading character of value
+ *
+ */
+static __ATTR_PURE size_t derived_length_ai23(const char* const value) {
+	return (value[0] >= '0' && value[0] <= '9') ? (size_t)((value[0] - '0') * 2 + 2) : 0;
+}
+
+static size_t (* const aiDerivedLengths[100])(const char* const value) = {
+	[23] = derived_length_ai23,
+};
+
+__ATTR_PURE bool gs1_aiPrefixHasDerivedLength(const char* const ai) {
+	assert(ai[0] >= '0' && ai[0] <= '9' && ai[1] >= '0' && ai[1] <= '9');
+	return aiDerivedLengths[(ai[0] - '0') * 10 + (ai[1] - '0')] != NULL;	// NULL: no derived length function
+}
+
+
+/*
  * Pseudo AI table entries allowing AIs that are not present in the above table
  * to be "vivified" if PermitUnknownAIs is enabled
  *
@@ -729,6 +747,24 @@ fail:
 }
 
 
+// Value length the parser consumes for a NO_FNC1 AI: derived from the value
+// where the AI has a derived length (e.g. retired AI 23), else sum of part max.
+static __ATTR_PURE size_t aiPredefinedLength(const struct aiEntry *const entry,
+					     const char *const value) {
+
+	const struct aiComponent *part;
+	size_t total = 0;
+
+	if (entry->ailen == 2 && gs1_aiPrefixHasDerivedLength(entry->ai))
+		return aiDerivedLengths[(entry->ai[0] - '0') * 10 + (entry->ai[1] - '0')](value);
+
+	for (part = entry->parts; part->cset; part++)
+		total += part->max;
+	return total;
+
+}
+
+
 /*
  *  Validate regular AI data ("^...") and optionally extract AIs
  *
@@ -786,6 +822,13 @@ bool gs1_processAIdata(gs1_encoder* const ctx, const char* const dataStr, const 
 		// r points to the next FNC1 or end of string...
 		r = p;
 		while (*r && *r != '^') r++;
+
+		// ...or to the predefined-length boundary if no FNC1 is expected
+		if (entry->fnc1 == NO_FNC1) {
+			const char *l = p + aiPredefinedLength(entry, p);
+			if (l < r)
+				r = l;
+		}
 
 		// Validate and return how much was consumed
 		if ((vallen = validate_ai_val(ctx, ai, entry, p, r)) == 0)
@@ -861,7 +904,7 @@ static bool validateAImutex(gs1_encoder* const ctx) {
 
 				const struct aiValue *matchedAI;
 
-				assert(tok2.len <= MAX_AI_LEN);
+				assert(tok2.len >= MIN_AI_LEN && tok2.len <= MAX_AI_LEN);
 
 				if (!existsInAIdata(ctx, tok2.ptr, tok2.len, ai->ai, &matchedAI))
 					continue;
@@ -1330,6 +1373,13 @@ void test_ai_parseAIdata(void) {
 	test_parseAIdata(true,  "(10)12345\\(11)991225", "^1012345(11)991225");			// Escaped bracket
 	test_parseAIdata(true,  "(10)12345\\(", "^1012345(");					// At end if fine
 
+	test_parseAIdata(true,  "(235)ABC", "^235ABC");						// X..28, FNC1-required, single AI
+	test_parseAIdata(true,  "(01)12345678901231(235)XYZ", "^0112345678901231235XYZ");	// No FNC1 after (01) NO_FNC1
+	test_parseAIdata(true,  "(01)12345678901231(235)XYZ(10)BATCH",
+		"^0112345678901231235XYZ^10BATCH");						// FNC1 after (235) DO_FNC1
+	test_parseAIdata(true,  "(235)ABCDEFGHIJKLMNOPQRSTUVWXYZ12", "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ12");	// X..28 at max
+	test_parseAIdata(false, "(235)ABCDEFGHIJKLMNOPQRSTUVWXYZ123", "");			// Over max
+
 	test_parseAIdata(false, "(10)(11)98765", "");						// Value must not be empty
 	test_parseAIdata(false, "(10)12345(11)", "");						// Value must not be empty
 	test_parseAIdata(false, "(1A)12345", "");						// AI must be numeric
@@ -1717,6 +1767,12 @@ void test_ai_processAIdata(void) {
 	test_processAIdata(true,  "^7230123");					// Shortest
 	test_processAIdata(false, "^723012");					// Too short
 
+	test_processAIdata(true,  "^235ABC");					// X..28; FNC1 required
+	test_processAIdata(true,  "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ12");		// X..28 at max
+	test_processAIdata(false, "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ123");		// Over max
+	test_processAIdata(true,  "^0112345678901231235XYZ");			// (01) NO_FNC1 -> no ^ before 235
+	test_processAIdata(true,  "^0112345678901231235XYZ^10BATCH");		// (235) DO_FNC1 -> ^ before next AI
+
 	test_processAIdata(false, "^423");					// List of 3-digit ISO-3166 codes
 	test_processAIdata(false, "^4235");
 	test_processAIdata(false, "^42352");
@@ -1836,6 +1892,134 @@ static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, 
 
 	TEST_CHECK(fn(ctx));
 	TEST_MSG("Expected success. Got: %s", ctx->errMsg);
+
+}
+
+void test_ai_predefinedLength(void) {
+
+	const char* const path = "test-ai-predefined.txt";
+	FILE* fp;
+	gs1_encoder* ctx;
+	gs1_encoder_init_opts_t opts = { .struct_size = sizeof(opts), .syntaxDictionary = path };
+	size_t i;
+
+	// Section 1: formula correctness across input/output paths with a dict
+	// spec wide enough (N..20) to accommodate every formula output (2..20)
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("10  X..20  # BATCH\n23  *  N..20  # APP-23\n", fp);
+	fclose(fp);
+	TEST_ASSERT((ctx = gs1_encoder_init_ex(NULL, &opts)) != NULL);
+	if (ctx) {
+
+		{
+		struct { int n; const char* v23; } cases[] = {
+			{ 0, "00"                   },
+			{ 1, "1234"                 },
+			{ 5, "567890123456"         },
+			{ 9, "91234567890123456789" },
+		};
+
+		for (i = 0; i < sizeof(cases)/sizeof(*cases); i++) {
+
+			char in_bracketed[64], in_raw[64], in_scan[64], expected[64];
+
+			snprintf(expected, sizeof(expected), "(23)%s(10)ABC", cases[i].v23);
+
+			// Input: bracketed AI element string
+			snprintf(in_bracketed, sizeof(in_bracketed), "(23)%s(10)ABC", cases[i].v23);
+			TEST_CHECK(gs1_encoder_setAIdataStr(ctx, in_bracketed));
+			TEST_MSG("setAIdataStr failed for n=%d: %s", cases[i].n, ctx->errMsg);
+			TEST_CHECK(strcmp(gs1_encoder_getAIdataStr(ctx), expected) == 0);
+			TEST_MSG("n=%d: got=%s expected=%s", cases[i].n, gs1_encoder_getAIdataStr(ctx), expected);
+
+			// Input: raw GS1 element string (NO_FNC1 => no ^ between 23 and 10)
+			snprintf(in_raw, sizeof(in_raw), "^23%s10ABC", cases[i].v23);
+			TEST_CHECK(gs1_encoder_setDataStr(ctx, in_raw));
+			TEST_MSG("setDataStr failed for n=%d: %s", cases[i].n, ctx->errMsg);
+			TEST_CHECK(strcmp(gs1_encoder_getAIdataStr(ctx), expected) == 0);
+
+			// Input: scan data with the GS1-128 symbology identifier
+			snprintf(in_scan, sizeof(in_scan), "]C123%s10ABC", cases[i].v23);
+			TEST_CHECK(gs1_encoder_setScanData(ctx, in_scan));
+			TEST_MSG("setScanData ]C1 failed for n=%d: %s", cases[i].n, ctx->errMsg);
+			TEST_CHECK(strcmp(gs1_encoder_getAIdataStr(ctx), expected) == 0);
+
+			// Input: scan data with the DataBar Expanded symbology identifier
+			snprintf(in_scan, sizeof(in_scan), "]e023%s10ABC", cases[i].v23);
+			TEST_CHECK(gs1_encoder_setScanData(ctx, in_scan));
+			TEST_MSG("setScanData ]e0 failed for n=%d: %s", cases[i].n, ctx->errMsg);
+			TEST_CHECK(strcmp(gs1_encoder_getAIdataStr(ctx), expected) == 0);
+
+		}
+		}
+
+		// Output round-trip for one representative case
+		TEST_ASSERT(gs1_encoder_setAIdataStr(ctx, "(23)567890123456(10)ABC"));
+
+		TEST_CHECK(strcmp(gs1_encoder_getAIdataStr(ctx), "(23)567890123456(10)ABC") == 0);
+		TEST_CHECK(strcmp(gs1_encoder_getDataStr(ctx),   "^2356789012345610ABC")    == 0);
+
+		{
+			char** hri;
+			int n = gs1_encoder_getHRI(ctx, &hri);
+			TEST_CHECK(n == 2);
+			if (n == 2) {
+				TEST_CHECK(strcmp(hri[0], "(23) 567890123456") == 0);
+				TEST_CHECK(strcmp(hri[1], "(10) ABC")          == 0);
+			}
+		}
+
+		gs1_encoder_setSym(ctx, gs1_encoder_sGS1_128_CCA);
+		TEST_CHECK(strcmp(gs1_encoder_getScanData(ctx), "]C12356789012345610ABC") == 0);
+
+		gs1_encoder_free(ctx);
+	}
+
+	// Section 2: the entry's declared min/max remain authoritative — the
+	// formula picks a length within them; out-of-range data is rejected
+
+	// (23) variable up to 10: formula outputs ≤ 10 fit; > 10 rejected by the
+	// bracketed-input length pre-check before the formula is consulted
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("10  X..20  # BATCH\n23  *  N..10  # APP-23\n", fp);
+	fclose(fp);
+	TEST_ASSERT((ctx = gs1_encoder_init_ex(NULL, &opts)) != NULL);
+	if (ctx) {
+		TEST_CHECK( gs1_encoder_setAIdataStr(ctx, "(23)4567890123(10)A"));	// n=4, formula=10 == max
+		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, "(23)567890123456(10)A"));	// n=5, formula=12 > max
+		gs1_encoder_free(ctx);
+	}
+
+	// (23) fixed N4: bracketed value MUST be exactly 4 regardless of formula's n
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("10  X..20  # BATCH\n23  *  N4  # APP-23\n", fp);
+	fclose(fp);
+	TEST_ASSERT((ctx = gs1_encoder_init_ex(NULL, &opts)) != NULL);
+	if (ctx) {
+		TEST_CHECK( gs1_encoder_setAIdataStr(ctx, "(23)1234(10)A"));		// 4 chars: fits N4
+		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, "(23)123456(10)A"));		// 6 chars: too long for N4
+		gs1_encoder_free(ctx);
+	}
+
+	// Multi-component sum(max)=12: bracketed value of 12 chars fits
+	fp = fopen(path, "wb");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("10  X..20  # BATCH\n23  *  N2  N..10  # APP-23\n", fp);
+	fclose(fp);
+	TEST_ASSERT((ctx = gs1_encoder_init_ex(NULL, &opts)) != NULL);
+	if (ctx) {
+		TEST_CHECK( gs1_encoder_setAIdataStr(ctx, "(23)912345678901(10)A"));	// 12 chars matches sum(max)
+		gs1_encoder_free(ctx);
+	}
+
+	remove(path);
 
 }
 
