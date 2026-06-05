@@ -412,6 +412,11 @@ static inline __ATTR_PURE bool validateAIdataTemplate(const void* const needle, 
 /*
  *  Compare function for sorting AI pointers by their lexical value
  *
+ *  Comparing only the left operand's ailen is a consistent ordering because
+ *  AIs are prefix-free: no AI is a prefix of another, including vivified
+ *  unknown AIs whose length is fixed by their two-digit prefix. A prefix pair
+ *  of differing lengths would make this asymmetric and break qsort.
+ *
  */
 static inline __ATTR_PURE int compareAIPointers(const void* const a, const void* const b) {
 
@@ -723,7 +728,7 @@ again:
 			.ai = outai,
 			.ailen = (uint8_t)ailen,
 			.value = outval,
-			.vallen = (uint8_t)outval_len,
+			.vallen = (uint16_t)outval_len,
 			.dlPathOrder = DL_PATH_ORDER_ATTRIBUTE
 		};
 
@@ -846,7 +851,7 @@ bool gs1_processAIdata(gs1_encoder* const ctx, const char* const dataStr, const 
 				.ai = ai,
 				.ailen = entry->ailen,
 				.value = p,
-				.vallen = (uint8_t)vallen,
+				.vallen = (uint16_t)vallen,
 				.dlPathOrder = DL_PATH_ORDER_ATTRIBUTE
 			};
 		}
