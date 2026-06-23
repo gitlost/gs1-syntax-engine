@@ -44,7 +44,7 @@ The main operations of the library involve reading and updating the state of the
 
 ## Quick start
 
-### Building the Swift Package
+### Build the library as a local package
 
 To build the package:
 
@@ -59,7 +59,7 @@ To build for release:
 swift build -c release
 ```
 
-### Running the Example Application
+### Build the example against the local package
 
 After building, you can test it by running the interactive example application:
 
@@ -75,24 +75,35 @@ swift run Example --version
 
 The example application provides an interactive menu for testing different input formats and features.
 
-### Using in Your Own Project
+### Use the package in your own project
 
-To use the wrapper in your Swift project, add it as a dependency in your `Package.swift`:
+Add the published package as a dependency in your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(path: "<path-to-gs1-syntax-engine>/src/swift")
+    .package(url: "https://github.com/gs1/gs1encoders-swift", from: "1.4.1")
 ]
 ```
 
-Then add it to your target:
+Then add the `GS1Encoders` product to your target:
 
 ```swift
 targets: [
     .target(
         name: "MyApp",
-        dependencies: ["GS1Encoders"]
+        dependencies: [
+            .product(name: "GS1Encoders", package: "gs1encoders-swift")
+        ]
     )
+]
+```
+
+To build against the current source of this repository instead of a release — for
+local development — use a path dependency on `src/swift`:
+
+```swift
+dependencies: [
+    .package(path: "<path-to-gs1-syntax-engine>/src/swift")
 ]
 ```
 
@@ -159,12 +170,14 @@ To use the GS1 Barcode Syntax Engine in an iOS application:
 
 1. Create a new iOS App project in Xcode (File → New → Project → iOS → App)
 
-2. Add the Swift package as a local dependency:
+2. Add the Swift package dependency:
    - In Xcode, select File → Add Package Dependencies...
-   - Click "Add Local..." button at the bottom
-   - Navigate to and select the `gs1-syntax-engine/src/swift` directory
+   - In the search field, enter the package URL: `https://github.com/gs1/gs1encoders-swift`
+   - Choose the version rule (e.g. "Up to Next Major Version" starting from 1.4.1)
    - Click "Add Package"
    - In the dialog, ensure "GS1Encoders" is selected and click "Add Package"
+
+   For local development against this repository instead, click "Add Local..." and select the `gs1-syntax-engine/src/swift` directory.
 
 3. In your SwiftUI view or view controller, import and use the library:
 
