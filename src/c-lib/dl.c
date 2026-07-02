@@ -507,6 +507,7 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	int numPathAIs;
 	int i;
 	size_t dataStr_len = 0;
+	const size_t dataStrCap = MAX_DATA;	// dataStr is ctx->dlAIbuffer, written from the start
 
 	assert(ctx);
 	assert(dlData);
@@ -2132,7 +2133,7 @@ static void do_test_testGenerateDLuri(gs1_encoder* const ctx, const char* const 
 
 	ctx->numAIs = 0;
 	ctx->numSortedAIs = 0;
-	TEST_CHECK((ret = gs1_parseAIdata(ctx, aiData, out)) == true);
+	TEST_CHECK((ret = gs1_parseAIdata(ctx, aiData, out, sizeof(out)-1)) == true);
 	TEST_MSG("Parse failed for non-pair validation reasons. Err: %s", ctx->errMsg);
 	if (!ret)
 		return;

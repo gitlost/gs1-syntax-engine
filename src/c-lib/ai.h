@@ -142,9 +142,10 @@ struct validationEntry {
 #define AI_ENTRY_TERMINATOR AI_ENTRY( "", 0, 0, __, __, __, __, __, "", "" )
 
 
-// Write to unbracketed AI dataStr checking for overflow
+// Write to unbracketed AI dataStr checking for overflow against the
+// destination's remaining capacity (dataStrCap must be in scope)
 #define writeDataStr(v, v_len, offset) do {				\
-	if (*(offset) + v_len > MAX_DATA)				\
+	if (*(offset) + v_len > dataStrCap)				\
 		goto fail;						\
 	memcpy(dataStr + *(offset), v, v_len);				\
 	*(offset) += v_len;						\
@@ -160,7 +161,7 @@ const struct aiEntry* gs1_lookupAIentry(const gs1_encoder *ctx, const char *ai, 
 bool gs1_aiPrefixHasDerivedLength(const char *ai);
 bool existsInAIdata(const gs1_encoder *ctx, const char *ai, size_t ailen, const char *ignoreAI, const struct aiValue **matchedAI);
 bool gs1_aiValLengthContentCheck(gs1_encoder *ctx, const char *ai, const struct aiEntry *entry, const char *aiVal, size_t vallen);
-bool gs1_parseAIdata(gs1_encoder *ctx, const char *aiData, char *dataStr);
+bool gs1_parseAIdata(gs1_encoder *ctx, const char *aiData, char *dataStr, size_t dataStrCap);
 bool gs1_processAIdata(gs1_encoder *ctx, const char *dataStr, bool extractAIs);
 bool gs1_validateAIs(gs1_encoder* ctx);
 void gs1_loadValidationTable(gs1_encoder* ctx);

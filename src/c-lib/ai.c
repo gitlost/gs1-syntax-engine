@@ -651,7 +651,7 @@ bool gs1_aiValLengthContentCheck(gs1_encoder* const ctx, const char* const ai, c
  * Convert bracketed AI syntax data to regular AI data string with ^ = FNC1
  *
  */
-bool gs1_parseAIdata(gs1_encoder* const ctx, const char* const aiData, char* const dataStr) {
+bool gs1_parseAIdata(gs1_encoder* const ctx, const char* const aiData, char* const dataStr, const size_t dataStrCap) {
 
 	const char *p = aiData;
 	bool fnc1req = true;
@@ -1345,7 +1345,7 @@ static void do_test_parseAIdata(gs1_encoder* const ctx, const char* const file, 
 
 	ctx->numAIs = 0;
 	ctx->numSortedAIs = 0;
-	TEST_CHECK(gs1_parseAIdata(ctx, aiData, out) ^ (!should_succeed));
+	TEST_CHECK(gs1_parseAIdata(ctx, aiData, out, sizeof(out)-1) ^ (!should_succeed));
 	if (should_succeed) {
 		gs1_sortAIs(ctx);
 		TEST_CHECK(strcmp(out, expect) == 0);
@@ -1452,7 +1452,7 @@ void test_ai_parseAIdata(void) {
 
 		ctx->numAIs = 0;
 		ctx->numSortedAIs = 0;
-		TEST_CHECK(gs1_parseAIdata(ctx, inbuf, outbuf));	// Exactly 64 AIs
+		TEST_CHECK(gs1_parseAIdata(ctx, inbuf, outbuf, sizeof(outbuf)-1));	// Exactly 64 AIs
 
 		// One more AI pushes over the limit
 		*ip++ = '('; *ip++ = '9'; *ip++ = '9'; *ip++ = ')';
@@ -1461,7 +1461,21 @@ void test_ai_parseAIdata(void) {
 
 		ctx->numAIs = 0;
 		ctx->numSortedAIs = 0;
-		TEST_CHECK(!gs1_parseAIdata(ctx, inbuf, outbuf));	// 65 AIs, too many
+		TEST_CHECK(!gs1_parseAIdata(ctx, inbuf, outbuf, sizeof(outbuf)-1));	// 65 AIs, too many
+	}
+
+	// Parse must honour the supplied capacity, not MAX_DATA
+	{
+		char buf[64];
+		size_t k, clobbered = 0;
+
+		memset(buf, '#', sizeof(buf));			// Canary beyond the cap
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+		TEST_CHECK(!gs1_parseAIdata(ctx, "(99)ABCDEFGHIJ", buf, 5));	// Output exceeds cap
+		for (k = 6; k < sizeof(buf); k++)
+			if (buf[k] != '#') clobbered++;
+		TEST_CHECK(clobbered == 0);			// Nothing written past the cap
 	}
 
 
@@ -1482,7 +1496,7 @@ static void test_linters(gs1_encoder* const ctx, const char* const aiData, gs1_l
 
 	ctx->numAIs = 0;
 	ctx->numSortedAIs = 0;
-	TEST_CHECK(gs1_parseAIdata(ctx, aiData, out) || ctx->linterErr != GS1_LINTER_OK);
+	TEST_CHECK(gs1_parseAIdata(ctx, aiData, out, sizeof(out)-1) || ctx->linterErr != GS1_LINTER_OK);
 	gs1_sortAIs(ctx);
 	TEST_MSG("Parse failed for non-linter reasons. Err: %s", ctx->errMsg);
 
@@ -1883,7 +1897,7 @@ static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, 
 
 	ctx->numAIs = 0;
 	ctx->numSortedAIs = 0;
-	TEST_CHECK((ret = gs1_parseAIdata(ctx, aiData, out)) == true);
+	TEST_CHECK((ret = gs1_parseAIdata(ctx, aiData, out, sizeof(out)-1)) == true);
 	TEST_MSG("Parse failed for non-pair validation reasons. Err: %s", ctx->errMsg);
 	if (!ret)
 		return;
