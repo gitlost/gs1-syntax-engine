@@ -412,6 +412,7 @@ void test_api_copyDLignoredQueryParams(void);
 void test_api_allocFailures(void);
 #ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 void test_api_brokenPrefixSyndict(void);
+void test_api_tooManyDLkeyQualifiersSyndict(void);
 #endif
 
 #endif

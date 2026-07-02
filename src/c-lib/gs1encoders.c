@@ -2293,6 +2293,49 @@ void test_api_brokenPrefixSyndict(void) {
 		if (ctx) gs1_encoder_free(ctx);
 	}
 
+	// Same entries installed directly: setAItable rejects the table and
+	// falls back to embedded, leaving the specific error reported
+	{
+		gs1_encoder *ctx;
+		struct aiEntry *sd;
+
+		TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+		assert(ctx);
+		TEST_ASSERT((sd = gs1_loadSyntaxDictionary(ctx, path)) != NULL);
+		gs1_freeDLkeyQualifiers(ctx);
+		TEST_CHECK(gs1_setAItable(ctx, sd));
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_TABLE_BROKEN_PREFIXES_DIFFER_IN_LENGTH);
+		gs1_encoder_free(ctx);
+	}
+
+	remove(path);
+
+}
+
+
+void test_api_tooManyDLkeyQualifiersSyndict(void) {
+
+	const char* const path = "test-syndict-dlpkey-limit.txt";
+	FILE *fp;
+	gs1_encoder *ctx;
+	struct aiEntry *sd;
+
+	fp = fopen(path, "w");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("8888  ?  N4  dlpkey=10,11,12,13,14,15  # T\n", fp);	// One over MAX_DL_KEY_QUALIFIERS
+	fclose(fp);
+
+	// setAItable rejects the table and falls back to embedded, leaving
+	// the specific error reported
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+	assert(ctx);
+	TEST_ASSERT((sd = gs1_loadSyntaxDictionary(ctx, path)) != NULL);
+	gs1_freeDLkeyQualifiers(ctx);
+	TEST_CHECK(gs1_setAItable(ctx, sd));
+	TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_DL_KEY_QUALIFIERS);
+	gs1_encoder_free(ctx);
+
 	remove(path);
 
 }

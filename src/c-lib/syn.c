@@ -1005,20 +1005,29 @@ void test_syn_attrTemplateForm(void) {
 
 void test_syn_allocFailures(void) {
 
+	const char* const path = "test-syndict-alloc.txt";
 	gs1_encoder* ctx;
+	FILE *fp;
 
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
+
+	fp = fopen(path, "w");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) { gs1_encoder_free(ctx); return; }
+	fputs("01  N14,csum  # GTIN\n", fp);
+	fclose(fp);
 
 	/*
 	 *  gs1_loadSyntaxDictionary: malloc failure for AI table
 	 *
 	 */
 	test_alloc_fail_at = 1;
-	TEST_CHECK(gs1_loadSyntaxDictionary(ctx, "gs1-syntax-dictionary.txt") == NULL);
+	TEST_CHECK(gs1_loadSyntaxDictionary(ctx, path) == NULL);
 	TEST_CHECK(ctx->err == gs1_encoder_eFAILED_TO_ALLOCATE_AI_TABLE);
 	test_alloc_fail_at = 0;
 
+	remove(path);
 	gs1_encoder_free(ctx);
 
 }
@@ -1039,12 +1048,14 @@ void test_syn_capacityOverflow(void) {
 	pos = out;
 	strcpy(buf, "90  X..30  # TITLE");
 	TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 1) == -1);
+	TEST_CHECK(ctx->err == gs1_encoder_eSYNTAX_DICTIONARY_CAPACITY_TOO_SMALL);
 
 	// cap=2 + range: primary fits at slot 0, inheritance into slot 1 trips
 	memset(out, 0, sizeof(out));
 	pos = out;
 	strcpy(buf, "91-99  X..30  # TITLE");
 	TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 2) == -1);
+	TEST_CHECK(ctx->err == gs1_encoder_eSYNTAX_DICTIONARY_CAPACITY_TOO_SMALL);
 	gs1_freeSyntaxDictionaryEntries(ctx, out);
 
 	gs1_encoder_free(ctx);
@@ -1068,6 +1079,7 @@ void test_syn_strdupFailures(void) {
 	strcpy(buf, "90  X..30");
 	test_alloc_fail_at = 2;
 	TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 100) == -1);
+	TEST_CHECK(ctx->err == gs1_encoder_eFAILED_TO_ALLOCATE_MEMORY_FOR_TITLE);
 	test_alloc_fail_at = 0;
 	gs1_freeSyntaxDictionaryEntries(ctx, out);
 
@@ -1077,6 +1089,7 @@ void test_syn_strdupFailures(void) {
 	strcpy(buf, "91-99  X..30  # TITLE");
 	test_alloc_fail_at = 3;
 	TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 100) == -1);
+	TEST_CHECK(ctx->err == gs1_encoder_eFAILED_TO_ALLOCATE_MEMORY_FOR_ATTRS);
 	test_alloc_fail_at = 0;
 	gs1_freeSyntaxDictionaryEntries(ctx, out);
 
@@ -1086,6 +1099,7 @@ void test_syn_strdupFailures(void) {
 	strcpy(buf, "91-99  X..30  # TITLE");
 	test_alloc_fail_at = 4;
 	TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 100) == -1);
+	TEST_CHECK(ctx->err == gs1_encoder_eFAILED_TO_ALLOCATE_MEMORY_FOR_TITLE);
 	test_alloc_fail_at = 0;
 	gs1_freeSyntaxDictionaryEntries(ctx, out);
 
@@ -1163,6 +1177,21 @@ void test_syn_nulLeadingLine(void) {
 
 }
 
+void test_syn_cannotReadFile(void) {
+
+	gs1_encoder* ctx;
+
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+	assert(ctx);
+
+	TEST_CHECK(gs1_loadSyntaxDictionary(ctx, "no-such-syndict.txt") == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eCANNOT_READ_FILE);
+
+	gs1_encoder_free(ctx);
+
+}
+
+
 void test_syn_dictionaryOrder(void) {
 
 	const char* const path = "test-syndict-order.txt";
@@ -1172,6 +1201,22 @@ void test_syn_dictionaryOrder(void) {
 
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
+
+	// Entry level: each AI must lexically exceed its predecessor
+	{
+		struct aiEntry out[10];
+		struct aiEntry *pos;
+		char buf[32];
+
+		memset(out, 0, sizeof(out));
+		pos = out;
+		strcpy(buf, "99  X..30  # A");
+		TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 10) == 1);
+		strcpy(buf, "01  N14,csum  # B");
+		TEST_CHECK(parseSyntaxDictionaryEntry(ctx, buf, out, &pos, 10) == -1);
+		TEST_CHECK(ctx->err == gs1_encoder_eAIS_MUST_BE_IN_ASCENDING_ORDER);
+		gs1_freeSyntaxDictionaryEntries(ctx, out);
+	}
 
 	// Out-of-order AIs break the binary-search precondition and must be rejected
 	fp = fopen(path, "wb");

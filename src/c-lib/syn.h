@@ -48,6 +48,7 @@ void test_syn_parseSyntaxDictionaryEntry(void);
 void test_syn_attrTemplateForm(void);
 void test_syn_allocFailures(void);
 void test_syn_capacityOverflow(void);
+void test_syn_cannotReadFile(void);
 void test_syn_strdupFailures(void);
 void test_syn_lineTooLong(void);
 void test_syn_nulLeadingLine(void);
