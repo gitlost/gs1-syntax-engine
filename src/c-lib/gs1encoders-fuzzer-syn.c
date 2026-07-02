@@ -40,17 +40,25 @@
 #include "syn.h"
 
 
-// Exercise the major dictionary-dependent output paths for one AI data string
+// Exercise every dictionary-dependent output path for one AI data string, with
+// data titles both excluded from and included in the HRI, so that a hostile
+// dictionary cannot drive any output buffer past its bounds undetected
 static void drive(gs1_encoder* const ctx, const char* const aidata) {
 
-	char **hri;
+	char **out;
+	int t;
 
 	if (!gs1_encoder_setAIdataStr(ctx, aidata))
 		return;
 
 	gs1_encoder_getAIdataStr(ctx);
-	gs1_encoder_getHRI(ctx, &hri);
 	gs1_encoder_getDLuri(ctx, NULL);
+	gs1_encoder_getDLignoredQueryParams(ctx, &out);
+
+	for (t = 0; t <= 1; t++) {			// HRI without and with data titles
+		gs1_encoder_setIncludeDataTitlesInHRI(ctx, t);
+		gs1_encoder_getHRI(ctx, &out);
+	}
 
 }
 
@@ -149,44 +157,51 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	drive(ctx, "(3100)123456(3925)12599(00)123456789012345675");
 
 	/*
-	 *  Build a data string from the table's own AIs so their lengths, linters
-	 *  and attributes are exercised. Digits satisfy every CSET structurally, so
-	 *  components are filled with their minimum length of digits.
+	 *  Build data strings from the table's own AIs so their lengths, linters
+	 *  and attributes are exercised. Digits satisfy every CSET structurally.
+	 *  Two passes: minimum component lengths, then maximum lengths so that,
+	 *  combined with long data titles from a hostile dictionary, the output
+	 *  builders (e.g. HRI) are driven toward their buffer limits.
 	 *
 	 */
 	{
-		char data[MAX_DATA+1];
-		size_t n = 0;
-		int count = 0;
+		int maxfill;
 
-		for (e = ctx->aiTable; *e->ai && count < MAX_AIS; e++, count++) {
+		for (maxfill = 0; maxfill <= 1; maxfill++) {
 
-			char piece[2 + MAX_AI_LEN + MAX_PARTS*40 + 1];
-			size_t pn = 0;
-			int p;
+			char data[MAX_DATA+1];
+			size_t n = 0;
+			int count = 0;
 
-			piece[pn++] = '(';
-			memcpy(piece + pn, e->ai, e->ailen);
-			pn += e->ailen;
-			piece[pn++] = ')';
+			for (e = ctx->aiTable; *e->ai && count < MAX_AIS; e++, count++) {
 
-			for (p = 0; p < MAX_PARTS && e->parts[p].cset != cset_none; p++) {
-				int L = e->parts[p].min ? e->parts[p].min : 1;
-				if (L > 40)
-					L = 40;
-				while (L-- > 0)
-					piece[pn++] = '1';
+				char piece[2 + MAX_AI_LEN + MAX_PARTS*99 + 1];
+				size_t pn = 0;
+				int p;
+
+				piece[pn++] = '(';
+				memcpy(piece + pn, e->ai, e->ailen);
+				pn += e->ailen;
+				piece[pn++] = ')';
+
+				for (p = 0; p < MAX_PARTS && e->parts[p].cset != cset_none; p++) {
+					int L = maxfill ? e->parts[p].max
+							: (e->parts[p].min ? e->parts[p].min : 1);
+					while (L-- > 0)
+						piece[pn++] = '1';
+				}
+
+				if (n + pn >= sizeof(data))
+					break;
+				memcpy(data + n, piece, pn);
+				n += pn;
+
 			}
+			data[n] = '\0';
 
-			if (n + pn >= sizeof(data))
-				break;
-			memcpy(data + n, piece, pn);
-			n += pn;
+			drive(ctx, data);
 
 		}
-		data[n] = '\0';
-
-		drive(ctx, data);
 	}
 
 	// Scan-data parsing (AI syntax and DL URI) against the fuzzed table
