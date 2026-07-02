@@ -21,7 +21,7 @@
 
 "use strict";
 
-import { GS1encoder, GS1encoderGeneralException, GS1encoderParameterException, GS1encoderDigitalLinkException } from "./gs1encoder.mjs";
+import { GS1encoder, GS1encoderGeneralException, GS1encoderParameterException, GS1encoderDigitalLinkException, GS1encoderScanDataException } from "./gs1encoder.mjs";
 
 const SYNDICT_HOST_PATH = "../c-lib/gs1-syntax-dictionary.txt";
 
@@ -119,7 +119,8 @@ test('defaults', async () => {
   expect(gs1encoder.permitZeroSuppressedGTINinDLuris).toBe(false);
   expect(gs1encoder.includeDataTitlesInHRI).toBe(false);
   expect(gs1encoder.aiDataStr).toBeNull();
-  expect(gs1encoder.scanData).toBeNull();
+  expect(() => gs1encoder.scanData).toThrow(GS1encoderScanDataException);
+  expect(() => gs1encoder.scanData).toThrow("No symbology selected");
   expect(gs1encoder.hri).toStrictEqual([]);
   expect(gs1encoder.dlIgnoredQueryParams).toStrictEqual([]);
   expect(gs1encoder.errMarkup).toBe("");
@@ -197,7 +198,8 @@ test('nonAIdata', async () => {
 
   expect(() => { gs1encoder.dataStr = "TESTING" }).not.toThrow();
   expect(gs1encoder.aiDataStr).toBeNull();
-  expect(gs1encoder.scanData).toBeNull();
+  expect(() => gs1encoder.scanData).toThrow(GS1encoderScanDataException);
+  expect(() => gs1encoder.scanData).toThrow("No symbology selected");
   expect(gs1encoder.hri).toStrictEqual([]);
   expect(gs1encoder.dlIgnoredQueryParams).toStrictEqual([]);
   expect(() => { gs1encoder.getDLuri(null) }).toThrow(GS1encoderDigitalLinkException);
