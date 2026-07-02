@@ -1215,9 +1215,9 @@ e.g., <code>(01)12345678901231(10)ABC123</code>.</p>
                 <li class="item">
                   <div>
                     <code>
-                    <a name="/s:11GS1Encoders0A7EncoderC11getScanDataSSSgyF"></a>
+                    <a name="/s:11GS1Encoders0A7EncoderC11getScanDataSSyKF"></a>
                     <a name="//apple_ref/swift/Method/getScanData()" class="dashAnchor"></a>
-                    <a class="token" href="#/s:11GS1Encoders0A7EncoderC11getScanDataSSSgyF">getScanData()</a>
+                    <a class="token" href="#/s:11GS1Encoders0A7EncoderC11getScanDataSSyKF">getScanData()</a>
                     </code>
                   </div>
                   <div class="height-container">
@@ -1229,7 +1229,12 @@ e.g., <code>(01)12345678901231(10)ABC123</code>.</p>
 
 <p>Returns the scan data in the format that would be output by a barcode reader
 with AIM Symbology Identifiers enabled.</p>
-<div class="aside aside-see-also">
+<div class="aside aside-throws">
+    <p class="aside-title">Throws</p>
+    <code>GS1EncoderError.scanDataError</code> if no symbology is selected or the
+current data cannot be represented in the selected symbology
+
+</div><div class="aside aside-see-also">
     <p class="aside-title">See also</p>
     <code><a href="../Classes/GS1Encoder.html#/s:11GS1Encoders0A7EncoderC11setScanDatayySSKF">setScanData(_:)</a></code>
 
@@ -1240,7 +1245,7 @@ with AIM Symbology Identifiers enabled.</p>
                         <h4>Declaration</h4>
                         <div class="language">
                           <p class="aside-title">Swift</p>
-                          <pre class="highlight swift"><code><span class="kd">public</span> <span class="kd">func</span> <span class="nf">getScanData</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kt">String</span><span class="p">?</span></code></pre>
+                          <pre class="highlight swift"><code><span class="kd">public</span> <span class="kd">func</span> <span class="nf">getScanData</span><span class="p">()</span> <span class="k">throws</span> <span class="o">-&gt;</span> <span class="kt">String</span></code></pre>
 
                         </div>
                       </div>
@@ -1280,7 +1285,7 @@ and that any embedded FNC1 separator characters are represented by GS characters
 
 </div><div class="aside aside-see-also">
     <p class="aside-title">See also</p>
-    <code><a href="../Classes/GS1Encoder.html#/s:11GS1Encoders0A7EncoderC11getScanDataSSSgyF">getScanData()</a></code>
+    <code><a href="../Classes/GS1Encoder.html#/s:11GS1Encoders0A7EncoderC11getScanDataSSyKF">getScanData()</a></code>
 
 </div><div class="aside aside-see-also">
     <p class="aside-title">See also</p>

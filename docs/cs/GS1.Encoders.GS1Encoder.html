@@ -638,7 +638,7 @@ Default: <code>false</code>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><p>The scan data string that a reader should return when scanning the current data, or <code>null</code> if no symbology is set.</p>
+        <td><p>The scan data string that a reader should return when scanning the current data.</p>
 </td>
       </tr>
     </tbody>
@@ -679,6 +679,23 @@ symbol that is an instance of the selected symbology and contains the same input
 The output will be prefixed with the appropriate AIM symbology identifier.
 </p>
 </div>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="GS1.Encoders.GS1EncoderScanDataException.html">GS1EncoderScanDataException</a></td>
+        <td><p>Getting: if no symbology is selected or the current data cannot be represented in the selected symbology.
+Setting: if the scan data is invalid.</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
   <a id="GS1_Encoders_GS1Encoder_Sym_" data-uid="GS1.Encoders.GS1Encoder.Sym*"></a>
   <h4 id="GS1_Encoders_GS1Encoder_Sym" data-uid="GS1.Encoders.GS1Encoder.Sym">Sym</h4>
   <div class="markdown level1 summary"><p>Get/set the symbology type.</p>
