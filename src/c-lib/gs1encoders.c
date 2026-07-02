@@ -113,6 +113,8 @@ gs1_encoder* gs1_encoder_init_ex(void *mem, const gs1_encoder_init_opts_t *opts)
 		ctx = mem;
 	}
 
+	GS1_ENCODERS_UNPOISON_GUARDS(GS1_ENCODER_GUARDS, ctx);	// Clear any poison left from a prior use of caller-provided storage
+
 	// Set default parameters
 	ctx = memcpy(ctx, (&(struct gs1_encoder) {
 		.localAlloc = !mem,
@@ -134,6 +136,8 @@ gs1_encoder* gs1_encoder_init_ex(void *mem, const gs1_encoder_init_opts_t *opts)
 		.linterErr = GS1_LINTER_OK,
 		.linterErrMarkup = { 0 }
 	}), sizeof(struct gs1_encoder));
+
+	GS1_ENCODERS_POISON_GUARDS(GS1_ENCODER_GUARDS, ctx);
 
 	if (status) *status = GS1_ENCODERS_INIT_SUCCESS;
 	if (msgBuf && msgBufSize > 0)
@@ -233,6 +237,7 @@ void gs1_encoder_free(gs1_encoder* const ctx) {
 #endif
 
 	gs1_freeDLkeyQualifiers(ctx);
+	GS1_ENCODERS_UNPOISON_GUARDS(GS1_ENCODER_GUARDS, ctx);
 	if (ctx->localAlloc)
 		GS1_ENCODERS_FREE(ctx);
 }
