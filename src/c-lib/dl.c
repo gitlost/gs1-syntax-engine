@@ -434,7 +434,7 @@ static ssize_t URIunescape(char* const out, size_t maxlen, const char* const in,
 	assert(out);
 
 	for (i = 0, j = 0; i < inlen && j < maxlen; i++, j++) {
-		if (i < inlen - 2 && in[i] == '%') {
+		if (i + 2 < inlen && in[i] == '%') {
 			uint8_t hi = hex_nibble(in[i+1]);
 			uint8_t lo = hex_nibble(in[i+2]);
 			if (hi == UINT8_MAX || lo == UINT8_MAX) {	// Invalid hex character
@@ -1911,6 +1911,7 @@ void test_dl_URIunescape(void) {
 	test_URIunescape("A%FFB", "A" "\xFF" "B", "A" "\xFF" "B");	// Case mixing
 	test_URIunescape("A%4FB", "AOB", "AOB");
 	test_URIunescape("A%4fB", "AOB", "AOB");
+	test_URIunescape("%2B", "+", "+");				// Encoded "+" is literal, not a space
 	test_URIunescape("A%4gB", "A%4gB", "A%4gB");			// Non hex digit
 	test_URIunescape("A%4GB", "A%4GB", "A%4GB");			// Non hex digit
 	test_URIunescape("A%g4B", "A%g4B", "A%g4B");			// Non hex digit
@@ -1922,6 +1923,14 @@ void test_dl_URIunescape(void) {
 	// Truncated input
 	TEST_CHECK(URIunescape(out, MAX_AI_VALUE_LEN, "ABCD", 2, false) == 2);
 	TEST_CHECK(memcmp(out, "AB", 3) == 0);				// Includes \0
+
+	// Lone '%' must not read past inlen
+	TEST_CHECK(URIunescape(out, MAX_AI_VALUE_LEN, "%41", 1, false) == 1);
+	TEST_CHECK(memcmp(out, "%", 2) == 0);				// Includes \0
+
+	// Truncated escape stays literal
+	TEST_CHECK(URIunescape(out, MAX_AI_VALUE_LEN, "%4", 2, false) == 2);
+	TEST_CHECK(memcmp(out, "%4", 3) == 0);				// Includes \0
 
 	// Truncated output
 	TEST_CHECK(URIunescape(out, 2, "ABCD", 4, false) == -1);
@@ -1969,7 +1978,9 @@ void test_dl_URIescape(void) {
 
 	// Other characters that may appear in AIs that must be escaped
 	test_URIescape("!\"#%&'()*+,/:;<=>?", "%21%22%23%25%26%27%28%29%2A%2B%2C%2F%3A%3B%3C%3D%3E%3F", "%21%22%23%25%26%27%28%29%2A%2B%2C%2F%3A%3B%3C%3D%3E%3F");
+	test_URIescape("A\xFF" "B", "A%FFB", "A%FFB");			// High-bit byte
 
+	test_URIescape("", "", "");
 	test_URIescape("test", "test", "test");
 	test_URIescape(" ", "%20", "+");
 	test_URIescape(" AB", "%20AB", "+AB");
