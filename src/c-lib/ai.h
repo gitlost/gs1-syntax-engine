@@ -32,6 +32,7 @@
 #define MAX_AI_LEN		4
 #define MAX_AI_VALUE_LEN	90
 #define MAX_AI_ATTR_LEN		64
+#define MAX_AI_TITLE_LEN	70
 
 
 /*

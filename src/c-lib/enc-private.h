@@ -138,6 +138,11 @@
 
 #define SIZEOF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
 
+// Portable compile-time assertion
+#define GS1_ENCODERS_STATIC_ASSERT_(cond, id)	typedef char gs1_encoders_static_assert_##id[(cond) ? 1 : -1]
+#define GS1_ENCODERS_STATIC_ASSERT__(cond, id)	GS1_ENCODERS_STATIC_ASSERT_(cond, id)
+#define GS1_ENCODERS_STATIC_ASSERT(cond)	GS1_ENCODERS_STATIC_ASSERT__(cond, __LINE__)
+
 
 #include "ai.h"
 
@@ -242,6 +247,8 @@ typedef enum {
 	gs1_encoder_eSYNTAX_DICTIONARY_LINE_EXCEEDS_IMPL,
 	gs1_encoder_eSYNTAX_DICTIONARY_LINE_ERROR,
 	gs1_encoder_eDOMAIN_CONTAINS_ILLEGAL_CHARACTERS,
+	gs1_encoder_eAI_VALUE_LENGTH_EXCEEDS_IMPL,
+	gs1_encoder_eAI_TITLE_TOO_LONG,
 	__GS1_ENCODERS_NUM_ERRS
 } gs1_encoder_err_t;
 
@@ -301,6 +308,19 @@ struct gs1_encoder {
 	int numDLkeyQualifiers;			// Number of dlKeyQualifiers strings
 
 };
+
+
+/*
+ *  Compile-time guarantee that every per-AI output line fits within its share
+ *  of outStr (sizeof(outStr) / MAX_AIS), so that MAX_AIS lines never overrun it.
+ *  The loader caps AI value and data title lengths so these bounds hold:
+ *
+ *    getHRI:       "data_title (AI) value\0"
+ *    getAIdataStr: "(AI)" then the value with each byte escaped ("(" -> "\(")
+ *
+ */
+GS1_ENCODERS_STATIC_ASSERT(sizeof(((struct gs1_encoder *)0)->outStr) / MAX_AIS >= MAX_AI_TITLE_LEN + MAX_AI_LEN + MAX_AI_VALUE_LEN + 5);
+GS1_ENCODERS_STATIC_ASSERT(sizeof(((struct gs1_encoder *)0)->outStr) / MAX_AIS >= MAX_AI_LEN + 2*MAX_AI_VALUE_LEN + 2);
 
 
 // The guarded buffers of a gs1_encoder, declared once; passed to

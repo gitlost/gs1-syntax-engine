@@ -587,17 +587,17 @@ int gs1_encoder_getHRI(gs1_encoder* const ctx, char*** const out) {
 
 		assert(ai->aiEntry);
 
-		ctx->outHRI[j] = p;
-
 		if (ctx->includeDataTitlesInHRI && *ai->aiEntry->title != '\0')
 			title_len = strlen(ai->aiEntry->title);
 
 		/*
-		 *  "data_title (AI) VALUE" or "(AI) VALUE"
+		 *  "data_title (AI) VALUE" or "(AI) VALUE". The AI value, data title
+		 *  and AI count limits guarantee (see the outStr line-budget assert)
+		 *  that each line fits its share of outStr, so MAX_AIS lines cannot
+		 *  overrun it.
 		 *
 		 */
-		assert((title_len > 0 ? title_len + 1 : 0) + (size_t)ai->ailen + (size_t)ai->vallen + 4 <
-		       sizeof(ctx->outStr) - (size_t)(p - ctx->outStr));
+		ctx->outHRI[j] = p;
 
 		if (title_len > 0) {
 			memcpy(p, ai->aiEntry->title, title_len);

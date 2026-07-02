@@ -164,7 +164,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 	char *token;
 	char *saveptr = NULL;
 	char *p;
-	size_t len;
+	size_t len, vlen;
 	char rangeEnd;
 	int numparts, part, linter;
 	char buf[MAX_AI_ATTR_LEN + 2] = { 0 };
@@ -303,6 +303,13 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 			    (*entry)->parts[part].opt == OPT)
 				error(NO_FNC1_AI_MUST_BE_PREDEFINED_LENGTH);
 
+	// Total value length must fit the implementation limit that bounds the
+	// per-AI output lines (see the outStr line-budget assert)
+	for (part = 0, vlen = 0; part < numparts; part++)
+		vlen += (*entry)->parts[part].max;
+	if (vlen > MAX_AI_VALUE_LEN)
+		error_v(AI_VALUE_LENGTH_EXCEEDS_IMPL, MAX_AI_VALUE_LEN);
+
 	// Read the key/value attributes until the title delimiter
 	p = buf;
 	while (token && strcmp(token, "#") != 0) {
@@ -365,6 +372,9 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 	// Read until the end of line for the title
 	token = strtok_r(NULL, "", &saveptr);
 	if (token) {
+
+		if (strlen(token) > MAX_AI_TITLE_LEN)
+			error_v(AI_TITLE_TOO_LONG, MAX_AI_TITLE_LEN);
 
 		if (token[strspn(token, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567890#()-+,./²³ ")] != '\0')
 			error(TITLE_CONTAINS_ILLEGAL_CHARACTERS);
@@ -752,6 +762,19 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 		AI_ENTRY_TERMINATOR
 	} },
 	{ false, "90  ?  N..5 X..30", {							/* Non-final, variable-length component */
+		AI_ENTRY_TERMINATOR
+	} },
+	{ true, "90  X..90  # AT VALUE LIMIT", {						/* Value length at impl limit */
+		AI_ENTRY("90", DO_FNC1, NO_DATA_ATTR, X,1,90,MAN,_,_,_, __, __, __, __, "", "AT VALUE LIMIT"),
+		AI_ENTRY_TERMINATOR
+	} },
+	{ false, "90  X91", {								/* Value length exceeds impl limit */
+		AI_ENTRY_TERMINATOR
+	} },
+	{ false, "90  X99 X99 X99 X99 X99", {						/* Value length (5x99) exceeds impl limit */
+		AI_ENTRY_TERMINATOR
+	} },
+	{ false, "90  X..90  # TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT", {	/* Title (73) exceeds impl limit */
 		AI_ENTRY_TERMINATOR
 	} },
 

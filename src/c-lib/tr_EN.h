@@ -126,5 +126,7 @@
 #define TR_EN_SYNTAX_DICTIONARY_LINE_EXCEEDS_IMPL "Syntax Dictionary line %d: Exceeds implementation limit of %d characters"
 #define TR_EN_SYNTAX_DICTIONARY_LINE_ERROR "Syntax Dictionary line %d: %.*s"
 #define TR_EN_DOMAIN_CONTAINS_ILLEGAL_CHARACTERS "Domain contains illegal characters"
+#define TR_EN_AI_VALUE_LENGTH_EXCEEDS_IMPL "AI value length exceeds implementation limit of %d characters"
+#define TR_EN_AI_TITLE_TOO_LONG "AI title exceeds implementation limit of %d characters"
 
 #endif  /* TR_EN_H */
