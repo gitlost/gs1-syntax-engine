@@ -724,8 +724,12 @@ namespace GS1.Encoders
         /// Process scan data received from a barcode reader or return the expected scan data string.
         /// </summary>
         /// <value>
-        /// The scan data string that a reader should return when scanning the current data, or <c>null</c> if no symbology is set.
+        /// The scan data string that a reader should return when scanning the current data.
         /// </value>
+        /// <exception cref="GS1EncoderScanDataException">
+        /// Getting: if no symbology is selected or the current data cannot be represented in the selected symbology.
+        /// Setting: if the scan data is invalid.
+        /// </exception>
         /// <remarks>
         /// <para>
         /// <strong>Setting:</strong> Process normalised scan data received from a barcode reader with
@@ -766,7 +770,10 @@ namespace GS1.Encoders
         {
             get
             {
-                return Marshal.PtrToStringAnsi(gs1_encoder_getScanData(ctx));
+                string outStr = Marshal.PtrToStringAnsi(gs1_encoder_getScanData(ctx));
+                if (outStr == null)
+                    throw new GS1EncoderScanDataException(ErrMsg);
+                return outStr;
             }
             set
             {
