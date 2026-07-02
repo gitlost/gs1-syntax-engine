@@ -439,10 +439,12 @@ public class GS1Encoder {
     /// with AIM Symbology Identifiers enabled.
     ///
     /// - Returns: The scan data
+    /// - Throws: `GS1EncoderError.scanDataError` if no symbology is selected or the
+    ///   current data cannot be represented in the selected symbology
     /// - SeeAlso: `setScanData(_:)`
-    public func getScanData() -> String? {
+    public func getScanData() throws -> String {
         guard let ptr = gs1_encoder_getScanData(ctx) else {
-            return nil
+            throw GS1EncoderError.scanDataError(msg: self.getErrMsg())
         }
         return String(cString: ptr)
     }
