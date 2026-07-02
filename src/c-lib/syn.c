@@ -527,7 +527,9 @@ void gs1_freeSyntaxDictionaryEntries(const gs1_encoder* const ctx, struct aiEntr
 #include "acutest.h"
 #include "unittest.h"
 
-static void test_parseSyntaxDictionaryEntry(gs1_encoder* const ctx, char* const sdEntry, const struct aiEntry expectedAIentries[], bool expectSuccess) {
+static void test_parseSyntaxDictionaryEntry(gs1_encoder* const ctx, char* const sdEntry, const struct aiEntry expectedAIentries[], const gs1_encoder_err_t expect_err) {
+
+	const bool expectSuccess = expect_err == gs1_encoder_eNO_ERROR;
 
 	const uint16_t cap = 600;
 	int16_t numOut, expectOut = 0;
@@ -549,11 +551,14 @@ static void test_parseSyntaxDictionaryEntry(gs1_encoder* const ctx, char* const 
 	tmp = out;
 	strcpy(buf, sdEntry);
 
+	ctx->err = gs1_encoder_eNO_ERROR;
 	numOut = (int16_t)parseSyntaxDictionaryEntry(ctx, buf, out, &tmp, cap);
 
 	if (!expectSuccess) {
 		TEST_CHECK(numOut == -1);
 		TEST_MSG("Expacted failure. Got %d aiEntries", numOut);
+		TEST_CHECK(ctx->err == expect_err);
+		TEST_MSG("Expected err: %d; Got err: %d (%s)", expect_err, ctx->err, ctx->errMsg);
 		goto out;
 	}
 
@@ -596,45 +601,46 @@ out:
 
 
 struct test_parse_sd_entry_s {
-	bool expectSuccess;
+	gs1_encoder_err_t err;
 	char* sdEntry;
 	struct aiEntry aiEntries[11];
 };
 
+#define E(x) gs1_encoder_e##x
 struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 
 	/*
 	 *  Empty lines and comments
 	 *
 	 */
-	{ true,  "",				{ AI_ENTRY_TERMINATOR } },
-	{ true,  "#",				{ AI_ENTRY_TERMINATOR } },
-	{ true,  "# ",				{ AI_ENTRY_TERMINATOR } },
-	{ true,  "# COMMENT",			{ AI_ENTRY_TERMINATOR } },
+	{ E(OK),  "",				{ AI_ENTRY_TERMINATOR } },
+	{ E(OK),  "#",				{ AI_ENTRY_TERMINATOR } },
+	{ E(OK),  "# ",				{ AI_ENTRY_TERMINATOR } },
+	{ E(OK),  "# COMMENT",			{ AI_ENTRY_TERMINATOR } },
 
 	/*
 	 *  AI: single AI, various widths
 	 *
 	 */
-	{ true, "90  ?  X..30  # INTERNAL", {						/* Single AI */
+	{ E(OK), "90  ?  X..30  # INTERNAL", {						/* Single AI */
 		AI_ENTRY("90", DO_FNC1, DL_DATA_ATTR, X,1,30,MAN,_,_,_, __, __, __, __, "", "INTERNAL"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "253  ?  N13,csum,gcppos1 [X..17]  dlpkey  # GDTI", {			/* 3-digit AI, optional component */
+	{ E(OK), "253  ?  N13,csum,gcppos1 [X..17]  dlpkey  # GDTI", {			/* 3-digit AI, optional component */
 		AI_ENTRY("253", DO_FNC1, DL_DATA_ATTR, N,13,13,MAN,csum,gcppos1,_, X,1,17,OPT,_,_,_, __, __, __, "dlpkey", "GDTI"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "8200  X..70  req=01  # PRODUCT URL", {				/* 4-digit AI, not GS1 DL URI data attr */
+	{ E(OK), "8200  X..70  req=01  # PRODUCT URL", {			/* 4-digit AI, not GS1 DL URI data attr */
 		AI_ENTRY("8200", DO_FNC1, NO_DATA_ATTR, X,1,70,MAN,_,_,_, __, __, __, __, "req=01", "PRODUCT URL"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "9  X1", {								/* AI too short */
+	{ E(AI_HAS_WRONG_WIDTH), "9  X1", {						/* AI too short */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "12345  X1", {								/* AI too long */
+	{ E(AI_HAS_WRONG_WIDTH), "12345  X1", {						/* AI too long */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "9a  X1", {								/* AI not numeric */
+	{ E(AI_MUST_BE_NUMERIC), "9a  X1", {						/* AI not numeric */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -642,7 +648,7 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  AI: range of AIs
 	 *
 	 */
-	{ true, "91-99  ?  X..90  # INTERNAL", {					/* Range of AIs */
+	{ E(OK), "91-99  ?  X..90  # INTERNAL", {					/* Range of AIs */
 		AI_ENTRY("91", DO_FNC1, DL_DATA_ATTR, X,1,90,MAN,_,_,_, __, __, __, __, "", "INTERNAL"),
 		AI_ENTRY("92", DO_FNC1, DL_DATA_ATTR, X,1,90,MAN,_,_,_, __, __, __, __, "", "INTERNAL"),
 		AI_ENTRY("93", DO_FNC1, DL_DATA_ATTR, X,1,90,MAN,_,_,_, __, __, __, __, "", "INTERNAL"),
@@ -654,19 +660,19 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 		AI_ENTRY("99", DO_FNC1, DL_DATA_ATTR, X,1,90,MAN,_,_,_, __, __, __, __, "", "INTERNAL"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "9-99  X1", {								/* Range: wrong width */
+	{ E(AI_RANGE_HAS_WRONG_WIDTH), "9-99  X1", {					/* Range: wrong width */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "9-099  X1", {								/* Range: unequal width */
+	{ E(AIS_IN_RANGE_MUST_HAVE_EQUAL_WIDTH), "9-099  X1", {				/* Range: unequal width */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "9a-99  X1", {								/* Range: non-numeric */
+	{ E(AIS_MUST_BE_NUMERIC), "9a-99  X1", {					/* Range: non-numeric */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "10-29  X1", {								/* Range: differ in more than last digit */
+	{ E(AI_RANGE_PARTS_MAY_ONLY_DIFFER_IN_LAST_DIGIT), "10-29  X1", {		/* Range: differ in more than last digit */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "95-91  X1", {								/* Range: end does not exceed start */
+	{ E(AI_RANGE_END_MUST_EXCEED_RANGE_START), "95-91  X1", {			/* Range: end does not exceed start */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -674,17 +680,17 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Flags: *, !, ?
 	 *
 	 */
-	{ true, "01  * ?  N14,csum,gcppos1  ex=02,255,37  dlpkey=22,10,21|235  # GTIN", {	/* FNC1 not required, gappy flags */
+	{ E(OK), "01  * ?  N14,csum,gcppos1  ex=02,255,37  dlpkey=22,10,21|235  # GTIN", {	/* FNC1 not required, gappy flags */
 		AI_ENTRY("01", NO_FNC1, DL_DATA_ATTR, N,14,14,MAN,csum,gcppos1,_, __, __, __, __, "ex=02,255,37 dlpkey=22,10,21|235", "GTIN"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "414  *!?  N13,csum,gcppos1  dlpkey=254|7040  # LOC No.", {		/* Christmas tree case for flags */
+	{ E(OK), "414  *!?  N13,csum,gcppos1  dlpkey=254|7040  # LOC No.", {		/* Christmas tree case for flags */
 		AI_ENTRY("414", NO_FNC1, DL_DATA_ATTR, N,13,13,MAN,csum,gcppos1,_, __, __, __, __, "dlpkey=254|7040", "LOC No."),
 	} },
-	{ false, "90", {								/* Truncated after AI */
+	{ E(TRUNCATED_AFTER_AI), "90", {						/* Truncated after AI */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  ?", {								/* Truncated after flags */
+	{ E(TRUNCATED_AFTER_FLAGS), "90  ?", {						/* Truncated after flags */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -692,15 +698,15 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Components: character sets (X, N, Y, Z)
 	 *
 	 */
-	{ true, "8010  ?  Y..30,gcppos1  dlpkey=8011  # CPID", {			/* CSET 32 */
+	{ E(OK), "8010  ?  Y..30,gcppos1  dlpkey=8011  # CPID", {			/* CSET 32 */
 		AI_ENTRY("8010", DO_FNC1, DL_DATA_ATTR, Y,1,30,MAN,gcppos1,_,_, __, __, __, __, "dlpkey=8011", "CPID"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4307  ?  Z2,iso3166alpha2  # COUNTRY - INITIAL PROCESS.", {		/* CSET Z */
+	{ E(OK), "4307  ?  Z2,iso3166alpha2  # COUNTRY - INITIAL PROCESS.", {		/* CSET Z */
 		AI_ENTRY("4307", DO_FNC1, DL_DATA_ATTR, Z,2,2,MAN,iso3166alpha2,_,_, __, __, __, __, "", "COUNTRY - INITIAL PROCESS."),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  Q5", {								/* Unknown character set */
+	{ E(UNKNOWN_CHARACTER_SET), "90  Q5", {						/* Unknown character set */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -708,16 +714,16 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Components: fixed-length format spec
 	 *
 	 */
-	{ false, "90  X", {								/* Format spec too short */
+	{ E(FORMAT_SPEC_TOO_SHORT), "90  X", {						/* Format spec too short */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X0", {								/* Unrecognised format spec */
+	{ E(UNRECOGNISED_FORMAT_SPECIFICATION), "90  X0", {				/* Unrecognised format spec */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X123", {								/* Fixed-length: too many digits */
+	{ E(AI_LENGTH_TOO_LONG), "90  X123", {						/* Fixed-length: too many digits */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X1a", {								/* Fixed-length: non-digit in length */
+	{ E(AI_LENGTH_IS_NOT_A_NUMBER), "90  X1a", {					/* Fixed-length: non-digit in length */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -725,10 +731,10 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Components: variable-length format spec
 	 *
 	 */
-	{ false, "90  X..123", {							/* Variable-length: too many digits */
+	{ E(AI_LENGTH_TOO_LONG), "90  X..123", {					/* Variable-length: too many digits */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X..1a", {								/* Variable-length: non-digit in max */
+	{ E(AI_LENGTH_IS_NOT_A_NUMBER), "90  X..1a", {					/* Variable-length: non-digit in max */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -736,14 +742,14 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Components: optional components
 	 *
 	 */
-	{ true, "7007  ?  N6,yymmdd [N..6],yymmdd  req=01,02  # HARVEST DATE", {	/* Requisites */
+	{ E(OK), "7007  ?  N6,yymmdd [N..6],yymmdd  req=01,02  # HARVEST DATE", {	/* Requisites */
 		AI_ENTRY("7007", DO_FNC1, DL_DATA_ATTR, N,6,6,MAN,yymmdd,_,_, N,1,6,MAN,yymmdd,_,_, __, __, __, "req=01,02", "HARVEST DATE"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  [N5", {								/* Optional missing closing bracket */
+	{ E(FORMAT_SPEC_FOR_OPT_COMPONENT_MISSING_RT_SQ_BRACKET), "90  [N5", {		/* Optional missing closing bracket */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  ?  [N5] X5", {							/* Mandatory component follows optional */
+	{ E(MANDATORY_COMPONENT_CANNOT_FOLLOW_OPTIONAL_COMPONENTS), "90  ?  [N5] X5", {	/* Mandatory component follows optional */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -751,30 +757,30 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Components: count and ordering
 	 *
 	 */
-	{ true, "8001  ?  N4,nonzero N5,nonzero N3,nonzero N1,winding N1  req=01  # DIMENSIONS", {	/* Max components */
+	{ E(OK), "8001  ?  N4,nonzero N5,nonzero N3,nonzero N1,winding N1  req=01  # DIMENSIONS", {	/* Max components */
 		AI_ENTRY("8001", DO_FNC1, DL_DATA_ATTR, N,4,4,MAN,nonzero,_,_, N,5,5,MAN,nonzero,_,_, N,3,3,MAN,nonzero,_,_, N,1,1,MAN,winding,_,_, N,1,1,MAN,_,_,_, "req=01", "DIMENSIONS"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  #", {								/* No components */
+	{ E(AI_IS_MISSING_COMPONENTS), "90  #", {					/* No components */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  ?  N1 N1 N1 N1 N1 N1", {						/* Too many components (6 > max 5) */
+	{ E(NUMBER_OF_AI_COMPONENTS_EXCEEDS_IMPL), "90  ?  N1 N1 N1 N1 N1 N1", {	/* Too many components (6 > max 5) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  ?  N..5 X..30", {							/* Non-final, variable-length component */
+	{ E(ONLY_FINAL_COMPONENT_MAY_HAVE_VARIABLE_LENGTH), "90  ?  N..5 X..30", {	/* Non-final, variable-length component */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "90  X..90  # AT VALUE LIMIT", {						/* Value length at impl limit */
+	{ E(OK), "90  X..90  # AT VALUE LIMIT", {						/* Value length at impl limit */
 		AI_ENTRY("90", DO_FNC1, NO_DATA_ATTR, X,1,90,MAN,_,_,_, __, __, __, __, "", "AT VALUE LIMIT"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X91", {								/* Value length exceeds impl limit */
+	{ E(AI_VALUE_LENGTH_EXCEEDS_IMPL), "90  X91", {					/* Value length exceeds impl limit */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X99 X99 X99 X99 X99", {						/* Value length (5x99) exceeds impl limit */
+	{ E(AI_VALUE_LENGTH_EXCEEDS_IMPL), "90  X99 X99 X99 X99 X99", {			/* Value length (5x99) exceeds impl limit */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X..90  # TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT", {	/* Title (73) exceeds impl limit */
+	{ E(AI_TITLE_TOO_LONG), "90  X..90  # TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT", {	/* Title (73) exceeds impl limit */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -782,70 +788,70 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Components: linters
 	 *
 	 */
-	{ true, "8014  X..25,csumalpha,gcppos1,hasnondigit  req=01  # MUDI", {		/* Max linters */
+	{ E(OK), "8014  X..25,csumalpha,gcppos1,hasnondigit  req=01  # MUDI", {		/* Max linters */
 		AI_ENTRY("8014", DO_FNC1, NO_DATA_ATTR, X,1,25,MAN,csumalpha,gcppos1,hasnondigit, __, __, __, __, "req=01", "MUDI"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4308  ?  N3,iso3166 N3,iso4217 N1,iso5218  # COUNTRY/CURRENCY", {
+	{ E(OK), "4308  ?  N3,iso3166 N3,iso4217 N1,iso5218  # COUNTRY/CURRENCY", {
 		AI_ENTRY("4308", DO_FNC1, DL_DATA_ATTR, N,3,3,MAN,iso3166,_,_, N,3,3,MAN,iso4217,_,_, N,1,1,MAN,iso5218,_,_, __, __, "", "COUNTRY/CURRENCY"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4309  ?  N3,iso3166999 X..34,iban  # EXTENDED COUNTRY", {
+	{ E(OK), "4309  ?  N3,iso3166999 X..34,iban  # EXTENDED COUNTRY", {
 		AI_ENTRY("4309", DO_FNC1, DL_DATA_ATTR, N,3,3,MAN,iso3166999,_,_, X,1,34,MAN,iban,_,_, __, __, __, "", "EXTENDED COUNTRY"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "7003  ?  N8,yyyymmdd N2,hh N2,mi [N2],ss  # EXPIRATION DATE/TIME", {
+	{ E(OK), "7003  ?  N8,yyyymmdd N2,hh N2,mi [N2],ss  # EXPIRATION DATE/TIME", {
 		AI_ENTRY("7003", DO_FNC1, DL_DATA_ATTR, N,8,8,MAN,yyyymmdd,_,_, N,2,2,MAN,hh,_,_, N,2,2,MAN,mi,_,_, N,2,2,OPT,ss,_,_, __, "", "EXPIRATION DATE/TIME"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "7006  ?  N6,yymmd0 [N8],yyyymmd0  # FIRST FREEZE DATE", {
+	{ E(OK), "7006  ?  N6,yymmd0 [N8],yyyymmd0  # FIRST FREEZE DATE", {
 		AI_ENTRY("7006", DO_FNC1, DL_DATA_ATTR, N,6,6,MAN,yymmd0,_,_, N,8,8,OPT,yyyymmd0,_,_, __, __, __, "", "FIRST FREEZE DATE"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4310  ?  N4,hhmi N10,latitude N11,longitude  # GEO/TIME", {
+	{ E(OK), "4310  ?  N4,hhmi N10,latitude N11,longitude  # GEO/TIME", {
 		AI_ENTRY("4310", DO_FNC1, DL_DATA_ATTR, N,4,4,MAN,hhmi,_,_, N,10,10,MAN,latitude,_,_, N,11,11,MAN,longitude,_,_, __, __, "", "GEO/TIME"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4320  ?  X20,cset82,cset39,cset64  # CSET TEST", {
+	{ E(OK), "4320  ?  X20,cset82,cset39,cset64  # CSET TEST", {
 		AI_ENTRY("4320", DO_FNC1, DL_DATA_ATTR, X,20,20,MAN,cset82,cset39,cset64, __, __, __, __, "", "CSET TEST"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4321  ?  N10,csetnumeric X..10,hyphen  # CSET TEST 2", {
+	{ E(OK), "4321  ?  N10,csetnumeric X..10,hyphen  # CSET TEST 2", {
 		AI_ENTRY("4321", DO_FNC1, DL_DATA_ATTR, N,10,10,MAN,csetnumeric,_,_, X,1,10,MAN,hyphen,_,_, __, __, __, "", "CSET TEST 2"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4322  ?  N1,yesno N1,zero [N..5],nozeroprefix  # FLAGS", {
+	{ E(OK), "4322  ?  N1,yesno N1,zero [N..5],nozeroprefix  # FLAGS", {
 		AI_ENTRY("4322", DO_FNC1, DL_DATA_ATTR, N,1,1,MAN,yesno,_,_, N,1,1,MAN,zero,_,_, N,1,5,OPT,nozeroprefix,_,_, __, __, "", "FLAGS"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "8112  ?  X..70,couponposoffer  # PAPERLESS COUPON", {
+	{ E(OK), "8112  ?  X..70,couponposoffer  # PAPERLESS COUPON", {
 		AI_ENTRY("8112", DO_FNC1, DL_DATA_ATTR, X,1,70,MAN,couponposoffer,_,_, __, __, __, __, "", "PAPERLESS COUPON"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4323  ?  X4,pieceoftotal [X..10],posinseqslash  # PIECE", {
+	{ E(OK), "4323  ?  X4,pieceoftotal [X..10],posinseqslash  # PIECE", {
 		AI_ENTRY("4323", DO_FNC1, DL_DATA_ATTR, X,4,4,MAN,pieceoftotal,_,_, X,1,10,OPT,posinseqslash,_,_, __, __, __, "", "PIECE"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4324  ?  X..70,pcenc  # ENCODED DATA", {
+	{ E(OK), "4324  ?  X..70,pcenc  # ENCODED DATA", {
 		AI_ENTRY("4324", DO_FNC1, DL_DATA_ATTR, X,1,70,MAN,pcenc,_,_, __, __, __, __, "", "ENCODED DATA"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4325  ?  X..3,packagetype  # PACKAGE TYPE", {
+	{ E(OK), "4325  ?  X..3,packagetype  # PACKAGE TYPE", {
 		AI_ENTRY("4325", DO_FNC1, DL_DATA_ATTR, X,1,3,MAN,packagetype,_,_, __, __, __, __, "", "PACKAGE TYPE"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4326  ?  X3,importeridx [X..70],mediatype  # IMPORT MEDIA", {
+	{ E(OK), "4326  ?  X3,importeridx [X..70],mediatype  # IMPORT MEDIA", {
 		AI_ENTRY("4326", DO_FNC1, DL_DATA_ATTR, X,3,3,MAN,importeridx,_,_, X,1,70,OPT,mediatype,_,_, __, __, __, "", "IMPORT MEDIA"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true, "4329  ?  X20,gcppos2 [N..2],ss  # CODE", {
+	{ E(OK), "4329  ?  X20,gcppos2 [N..2],ss  # CODE", {
 		AI_ENTRY("4329", DO_FNC1, DL_DATA_ATTR, X,20,20,MAN,gcppos2,_,_, N,1,2,OPT,ss,_,_, __, __, __, "", "CODE"),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5,csum,csum,csum,csum", {					/* Too many linters (4 > max 3) */
+	{ E(NUMBER_OF_LINTERS_EXCEEDS_IMPL_LIMIT), "90  X5,csum,csum,csum,csum", {	/* Too many linters (4 > max 3) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5,badlinter", {							/* Unknown linter */
+	{ E(UNKNOWN_LINTER), "90  X5,badlinter", {					/* Unknown linter */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -853,29 +859,29 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Attributes
 	 *
 	 */
-	{ true, "90  ?  X..30  req=999", {						/* Attrs and no title */
+	{ E(OK), "90  ?  X..30  req=999", {						/* Attrs and no title */
 		AI_ENTRY("90", DO_FNC1, DL_DATA_ATTR, X,1,30,MAN,_,_,_, __, __, __, __, "req=999", ""),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  =value", {							/* Missing attribute name (LHS) */
+	{ E(ATTRIBUTE_NAME_REQUIRED_ON_LHS_OF_ASSIGNMENT), "90  X5  =value", {		/* Missing attribute name (LHS) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  Req=01", {							/* Attribute name: illegal chars (caught as bad component) */
+	{ E(UNKNOWN_CHARACTER_SET), "90  X5  Req=01", {					/* Attribute name: illegal chars (caught as bad component) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  req1=01", {							/* Attribute name: illegal chars (digit in name) */
+	{ E(ATTRIBUTE_NAME_CONTAINS_ILLEGAL_CHARACTERS), "90  X5  req1=01", {		/* Attribute name: illegal chars (digit in name) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  req=!!", {							/* Attribute value: illegal chars */
+	{ E(ATTRIBUTE_VALUE_CONTAINS_ILLEGAL_CHARACTERS), "90  X5  req=!!", {		/* Attribute value: illegal chars */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  req=", {							/* Missing attribute value (RHS) */
+	{ E(ATTRIBUTE_VALUE_REQUIRED_ON_RHS_OF_ASSIGNMENT), "90  X5  req=", {		/* Missing attribute value (RHS) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  Req", {							/* Singleton name: illegal chars (caught as bad component) */
+	{ E(UNKNOWN_CHARACTER_SET), "90  X5  Req", {					/* Singleton name: illegal chars (caught as bad component) */
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  req1", {							/* Singleton name: illegal chars (digit in name) */
+	{ E(SINGLETON_ATTRIBUTE_NAME_CONTAINS_ILLEGAL_CHARACTERS), "90  X5  req1", {	/* Singleton name: illegal chars (digit in name) */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -883,11 +889,11 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Title
 	 *
 	 */
-	{ true, "8110  ?  X..70,couponcode", {						/* No attrs and no title */
+	{ E(OK), "8110  ?  X..70,couponcode", {						/* No attrs and no title */
 		AI_ENTRY("8110", DO_FNC1, DL_DATA_ATTR, X,1,70,MAN,couponcode,_,_, __, __, __, __, "", ""),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ false, "90  X5  # @title", {							/* Title: illegal characters */
+	{ E(TITLE_CONTAINS_ILLEGAL_CHARACTERS), "90  X5  # @title", {			/* Title: illegal characters */
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -895,7 +901,7 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Attributes too long: cumulative attributes exceed MAX_AI_ATTR_LEN + 2 buffer
 	 *
 	 */
-	{ false, "90  X5  req=01 req=02 req=03 req=04 req=05 req=06 req=07 req=08 req=09 req=10", {
+	{ E(ATTRIBUTES_TOO_LONG), "90  X5  req=01 req=02 req=03 req=04 req=05 req=06 req=07 req=08 req=09 req=10", {
 		AI_ENTRY_TERMINATOR
 	} },
 
@@ -903,12 +909,12 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Attribute AI references must be well-formed AIs (templates permitted)
 	 *
 	 */
-	{ false, "01  N14,csum  ex=0",          { AI_ENTRY_TERMINATOR } },	// AI too short
-	{ false, "01  N14,csum  req=0",         { AI_ENTRY_TERMINATOR } },	// AI too short
-	{ false, "01  N14,csum  dlpkey=1",      { AI_ENTRY_TERMINATOR } },	// AI too short
-	{ false, "01  N14,csum  ex=12345",      { AI_ENTRY_TERMINATOR } },	// AI too long
-	{ false, "01  N14,csum  dlpkey=10,,21", { AI_ENTRY_TERMINATOR } },	// Empty AI
-	{ true,  "3900  ?  N4  ex=39nn", {					// Template permitted
+	{ E(ATTRIBUTE_AI_IS_NOT_WELL_FORMED), "01  N14,csum  ex=0",          { AI_ENTRY_TERMINATOR } },	// AI too short
+	{ E(ATTRIBUTE_AI_IS_NOT_WELL_FORMED), "01  N14,csum  req=0",         { AI_ENTRY_TERMINATOR } },	// AI too short
+	{ E(ATTRIBUTE_AI_IS_NOT_WELL_FORMED), "01  N14,csum  dlpkey=1",      { AI_ENTRY_TERMINATOR } },	// AI too short
+	{ E(ATTRIBUTE_AI_IS_NOT_WELL_FORMED), "01  N14,csum  ex=12345",      { AI_ENTRY_TERMINATOR } },	// AI too long
+	{ E(ATTRIBUTE_AI_IS_NOT_WELL_FORMED), "01  N14,csum  dlpkey=10,,21", { AI_ENTRY_TERMINATOR } },	// Empty AI
+	{ E(OK),  "3900  ?  N4  ex=39nn", {					// Template permitted
 		AI_ENTRY("3900", DO_FNC1, DL_DATA_ATTR, N,4,4,MAN,_,_,_, __, __, __, __, "ex=39nn", ""),
 		AI_ENTRY_TERMINATOR
 	} },
@@ -918,14 +924,14 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  mandatory, unless the AI's length is computed by a formula (e.g. AI 23)
 	 *
 	 */
-	{ false, "90  *  X..30",          { AI_ENTRY_TERMINATOR } },		// Variable final
-	{ false, "90  *  X5  X..30",      { AI_ENTRY_TERMINATOR } },		// Variable final
-	{ false, "90  *  [X5]",           { AI_ENTRY_TERMINATOR } },		// Optional
-	{ true,  "90  *  X5", {							// Fixed + mandatory: OK
+	{ E(NO_FNC1_AI_MUST_BE_PREDEFINED_LENGTH), "90  *  X..30",          { AI_ENTRY_TERMINATOR } },	// Variable final
+	{ E(NO_FNC1_AI_MUST_BE_PREDEFINED_LENGTH), "90  *  X5  X..30",      { AI_ENTRY_TERMINATOR } },	// Variable final
+	{ E(NO_FNC1_AI_MUST_BE_PREDEFINED_LENGTH), "90  *  [X5]",           { AI_ENTRY_TERMINATOR } },	// Optional
+	{ E(OK),  "90  *  X5", {						// Fixed + mandatory: OK
 		AI_ENTRY("90", NO_FNC1, NO_DATA_ATTR, X,5,5,MAN,_,_,_, __, __, __, __, "", ""),
 		AI_ENTRY_TERMINATOR
 	} },
-	{ true,  "23  *  N..20", {						// Formula AI exempt
+	{ E(OK),  "23  *  N..20", {						// Formula AI exempt
 		AI_ENTRY("23", NO_FNC1, NO_DATA_ATTR, N,1,20,MAN,_,_,_, __, __, __, __, "", ""),
 		AI_ENTRY_TERMINATOR
 	} },
@@ -934,10 +940,11 @@ struct test_parse_sd_entry_s tests_parse_sd_entry[] = {
 	 *  Entry too long: exceeds MAX_SD_ENTRY_LEN (150)
 	 *
 	 */
-	{ false, "90  X5  # title_padding_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", {
+	{ E(ENTRY_TOO_LONG), "90  X5  # title_padding_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", {
 		AI_ENTRY_TERMINATOR
 	} },
 };
+#undef E
 
 void test_syn_parseSyntaxDictionaryEntry(void) {
 
@@ -948,7 +955,7 @@ void test_syn_parseSyntaxDictionaryEntry(void) {
 	assert(ctx);
 
 	for (i = 0; i < SIZEOF_ARRAY(tests_parse_sd_entry); i++)
-		test_parseSyntaxDictionaryEntry(ctx, tests_parse_sd_entry[i].sdEntry, tests_parse_sd_entry[i].aiEntries, tests_parse_sd_entry[i].expectSuccess);
+		test_parseSyntaxDictionaryEntry(ctx, tests_parse_sd_entry[i].sdEntry, tests_parse_sd_entry[i].aiEntries, tests_parse_sd_entry[i].err);
 
 	gs1_encoder_free(ctx);
 
@@ -1009,6 +1016,7 @@ void test_syn_allocFailures(void) {
 	 */
 	test_alloc_fail_at = 1;
 	TEST_CHECK(gs1_loadSyntaxDictionary(ctx, "gs1-syntax-dictionary.txt") == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eFAILED_TO_ALLOCATE_AI_TABLE);
 	test_alloc_fail_at = 0;
 
 	gs1_encoder_free(ctx);
@@ -1110,6 +1118,7 @@ void test_syn_lineTooLong(void) {
 
 	sd = gs1_loadSyntaxDictionary(ctx, path);
 	TEST_CHECK(sd == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eSYNTAX_DICTIONARY_LINE_EXCEEDS_IMPL);
 	// LCOV_EXCL_START: cleanup only fires if the TEST_CHECK above fails
 	if (sd) {
 		gs1_freeSyntaxDictionaryEntries(ctx, sd);
@@ -1173,6 +1182,7 @@ void test_syn_dictionaryOrder(void) {
 	fclose(fp);
 	sd = gs1_loadSyntaxDictionary(ctx, path);
 	TEST_CHECK(sd == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eSYNTAX_DICTIONARY_LINE_ERROR);
 	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
 
 	// Duplicate AIs must be rejected
@@ -1184,6 +1194,7 @@ void test_syn_dictionaryOrder(void) {
 	fclose(fp);
 	sd = gs1_loadSyntaxDictionary(ctx, path);
 	TEST_CHECK(sd == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eSYNTAX_DICTIONARY_LINE_ERROR);
 	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
 
 	// Overlapping ranges are duplicates once expanded and must be rejected
@@ -1195,6 +1206,7 @@ void test_syn_dictionaryOrder(void) {
 	fclose(fp);
 	sd = gs1_loadSyntaxDictionary(ctx, path);
 	TEST_CHECK(sd == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eSYNTAX_DICTIONARY_LINE_ERROR);
 	if (sd) { gs1_freeSyntaxDictionaryEntries(ctx, sd); GS1_ENCODERS_FREE(sd); }
 
 	// Strictly-ascending AIs (including a non-overlapping range) must load

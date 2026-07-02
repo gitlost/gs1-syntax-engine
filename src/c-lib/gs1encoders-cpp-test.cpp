@@ -68,7 +68,8 @@ static void test_construct_with_missing_syndict_throws(void) {
 		gs1encoders::GS1Encoder gs(
 			gs1encoders::InitOpts{}.syntax_dictionary(
 				"/nonexistent/path/dict.txt"));
-	} catch (const gs1encoders::GS1EncoderGeneralException &) {
+	} catch (const gs1encoders::GS1EncoderGeneralException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
 		threw = true;
 	}
 	TEST_CHECK(threw);
@@ -168,7 +169,8 @@ static void test_set_sym_invalid_throws(void) {
 	bool threw = false;
 	try {
 		gs.set_sym(gs1encoders::Symbology::NumSyms);
-	} catch (const gs1encoders::GS1EncoderParameterException &) {
+	} catch (const gs1encoders::GS1EncoderParameterException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
 		threw = true;
 	}
 	TEST_CHECK(threw);
@@ -279,7 +281,8 @@ static void test_set_scan_data_invalid_throws(void) {
 	bool threw = false;
 	try {
 		gs.set_scan_data("garbage");
-	} catch (const gs1encoders::GS1EncoderScanDataException &) {
+	} catch (const gs1encoders::GS1EncoderScanDataException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
 		threw = true;
 	}
 	TEST_CHECK(threw);

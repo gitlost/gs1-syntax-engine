@@ -1335,8 +1335,9 @@ void test_ai_AItableVsIsFNC1required(void) {
 }
 
 
-static void do_test_parseAIdata(gs1_encoder* const ctx, const char* const file, const int line, const bool should_succeed, const char* const aiData, const char* const expect) {
+static void do_test_parseAIdata(gs1_encoder* const ctx, const char* const file, const int line, const gs1_encoder_err_t expect_err, const char* const aiData, const char* const expect) {
 
+	const bool should_succeed = expect_err == gs1_encoder_eNO_ERROR;
 	char out[256];
 	char casename[256];
 
@@ -1346,11 +1347,14 @@ static void do_test_parseAIdata(gs1_encoder* const ctx, const char* const file, 
 	ctx->numAIs = 0;
 	ctx->numSortedAIs = 0;
 	TEST_CHECK(gs1_parseAIdata(ctx, aiData, out, sizeof(out)-1) ^ (!should_succeed));
+	TEST_MSG("Given: %s; Got: %s; Expected: %s; Err: %s", aiData, out, expect, ctx->errMsg);
+	TEST_CHECK(ctx->err == expect_err);
+	TEST_MSG("Given: %s; Expected err: %d; Got err: %d (%s)", aiData, expect_err, ctx->err, ctx->errMsg);
 	if (should_succeed) {
 		gs1_sortAIs(ctx);
 		TEST_CHECK(strcmp(out, expect) == 0);
+		TEST_MSG("Given: %s; Got: %s; Expected: %s", aiData, out, expect);
 	}
-	TEST_MSG("Given: %s; Got: %s; Expected: %s; Err: %s", aiData, out, expect, ctx->errMsg);
 
 }
 
@@ -1365,40 +1369,40 @@ void test_ai_parseAIdata(void) {
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
-#define test_parseAIdata(s, d, e) do {					\
-	do_test_parseAIdata(ctx, __FILE__, __LINE__, s, d, e);		\
+#define test_parseAIdata(err, d, e) do {					\
+	do_test_parseAIdata(ctx, __FILE__, __LINE__, gs1_encoder_e##err, d, e);	\
 } while (0)
 
-	test_parseAIdata(true,  "(01)12345678901231", "^0112345678901231");
-	test_parseAIdata(true,  "(10)12345", "^1012345");
-	test_parseAIdata(true,  "(01)12345678901231(10)12345", "^01123456789012311012345");	// No FNC1 after (01)
-	test_parseAIdata(true,  "(3100)123456(10)12345", "^31001234561012345");			// No FNC1 after (3100)
-	test_parseAIdata(true,  "(10)12345(11)991225", "^1012345^11991225");			// FNC1 after (10)
-	test_parseAIdata(true,  "(3900)12345(11)991225", "^390012345^11991225");		// FNC1 after (3900)
-	test_parseAIdata(true,  "(10)12345\\(11)991225", "^1012345(11)991225");			// Escaped bracket
-	test_parseAIdata(true,  "(10)12345\\(", "^1012345(");					// At end if fine
+	test_parseAIdata(OK, "(01)12345678901231", "^0112345678901231");
+	test_parseAIdata(OK, "(10)12345", "^1012345");
+	test_parseAIdata(OK, "(01)12345678901231(10)12345", "^01123456789012311012345");	// No FNC1 after (01)
+	test_parseAIdata(OK, "(3100)123456(10)12345", "^31001234561012345");			// No FNC1 after (3100)
+	test_parseAIdata(OK, "(10)12345(11)991225", "^1012345^11991225");			// FNC1 after (10)
+	test_parseAIdata(OK, "(3900)12345(11)991225", "^390012345^11991225");			// FNC1 after (3900)
+	test_parseAIdata(OK, "(10)12345\\(11)991225", "^1012345(11)991225");			// Escaped bracket
+	test_parseAIdata(OK, "(10)12345\\(", "^1012345(");					// At end if fine
 
-	test_parseAIdata(true,  "(235)ABC", "^235ABC");						// X..28, FNC1-required, single AI
-	test_parseAIdata(true,  "(01)12345678901231(235)XYZ", "^0112345678901231235XYZ");	// No FNC1 after (01) NO_FNC1
-	test_parseAIdata(true,  "(01)12345678901231(235)XYZ(10)BATCH",
+	test_parseAIdata(OK, "(235)ABC", "^235ABC");						// X..28, FNC1-required, single AI
+	test_parseAIdata(OK, "(01)12345678901231(235)XYZ", "^0112345678901231235XYZ");		// No FNC1 after (01) NO_FNC1
+	test_parseAIdata(OK, "(01)12345678901231(235)XYZ(10)BATCH",
 		"^0112345678901231235XYZ^10BATCH");						// FNC1 after (235) DO_FNC1
-	test_parseAIdata(true,  "(235)ABCDEFGHIJKLMNOPQRSTUVWXYZ12", "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ12");	// X..28 at max
-	test_parseAIdata(false, "(235)ABCDEFGHIJKLMNOPQRSTUVWXYZ123", "");			// Over max
+	test_parseAIdata(OK, "(235)ABCDEFGHIJKLMNOPQRSTUVWXYZ12", "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ12");		// X..28 at max
+	test_parseAIdata(AI_VALUE_IS_TOO_LONG, "(235)ABCDEFGHIJKLMNOPQRSTUVWXYZ123", "");	// Over max
 
-	test_parseAIdata(false, "(10)(11)98765", "");						// Value must not be empty
-	test_parseAIdata(false, "(10)12345(11)", "");						// Value must not be empty
-	test_parseAIdata(false, "(1A)12345", "");						// AI must be numeric
-	test_parseAIdata(false, "1(12345", "");							// Must start with AI
-	test_parseAIdata(false, "12345", "");							// Must start with AI
-	test_parseAIdata(false, "()12345", "");							// AI too short
-	test_parseAIdata(false, "(1)12345", "");						// AI too short
-	test_parseAIdata(false, "(12345)12345", "");						// AI too long
-	test_parseAIdata(false, "(15", "");							// AI must terminate
-	test_parseAIdata(false, "(1", "");							// AI must terminate
-	test_parseAIdata(false, "(", "");							// AI must terminate
-	test_parseAIdata(false, "(01)123456789012312(10)12345", "");				// Fixed-length AI too long
-	test_parseAIdata(false, "(10)12345^", "");						// Reject "^": Conflated with FNC1
-	test_parseAIdata(false, "(17)9(90)217", "");						// Should not parse to ^7990217
+	test_parseAIdata(AI_VALUE_IS_TOO_SHORT, "(10)(11)98765", "");				// Value must not be empty
+	test_parseAIdata(AI_PARSE_FAILED, "(10)12345(11)", "");					// Value must not be empty
+	test_parseAIdata(AI_UNRECOGNISED, "(1A)12345", "");					// AI must be numeric
+	test_parseAIdata(AI_PARSE_FAILED, "1(12345", "");					// Must start with AI
+	test_parseAIdata(AI_PARSE_FAILED, "12345", "");						// Must start with AI
+	test_parseAIdata(AI_UNRECOGNISED, "()12345", "");					// AI too short
+	test_parseAIdata(AI_UNRECOGNISED, "(1)12345", "");					// AI too short
+	test_parseAIdata(AI_UNRECOGNISED, "(12345)12345", "");					// AI too long
+	test_parseAIdata(AI_PARSE_FAILED, "(15", "");						// AI must terminate
+	test_parseAIdata(AI_PARSE_FAILED, "(1", "");						// AI must terminate
+	test_parseAIdata(AI_PARSE_FAILED, "(", "");						// AI must terminate
+	test_parseAIdata(AI_VALUE_IS_TOO_LONG, "(01)123456789012312(10)12345", "");		// Fixed-length AI too long
+	test_parseAIdata(AI_CONTAINS_ILLEGAL_CARAT_CHARACTER, "(10)12345^", "");		// Reject "^": Conflated with FNC1
+	test_parseAIdata(AI_VALUE_IS_TOO_SHORT, "(17)9(90)217", "");				// Should not parse to ^7990217
 
 
 	/*
@@ -1420,11 +1424,11 @@ void test_ai_parseAIdata(void) {
 			expbuf[3 + j] = 'A';
 		expbuf[93] = '\0';
 
-		test_parseAIdata(true, inbuf, expbuf);				// Exactly 90 chars
+		test_parseAIdata(OK, inbuf, expbuf);				// Exactly 90 chars
 
 		inbuf[95] = '\0';
 		inbuf[94] = 'A';
-		test_parseAIdata(false, inbuf, "");				// 91 chars, too long
+		test_parseAIdata(AI_VALUE_IS_TOO_LONG, inbuf, "");		// 91 chars, too long
 	}
 
 
@@ -1462,6 +1466,7 @@ void test_ai_parseAIdata(void) {
 		ctx->numAIs = 0;
 		ctx->numSortedAIs = 0;
 		TEST_CHECK(!gs1_parseAIdata(ctx, inbuf, outbuf, sizeof(outbuf)-1));	// 65 AIs, too many
+		TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_AIS);
 	}
 
 	// Parse must honour the supplied capacity, not MAX_DATA
@@ -1473,6 +1478,7 @@ void test_ai_parseAIdata(void) {
 		ctx->numAIs = 0;
 		ctx->numSortedAIs = 0;
 		TEST_CHECK(!gs1_parseAIdata(ctx, "(99)ABCDEFGHIJ", buf, 5));	// Output exceeds cap
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_PARSE_FAILED);
 		for (k = 6; k < sizeof(buf); k++)
 			if (buf[k] != '#') clobbered++;
 		TEST_CHECK(clobbered == 0);			// Nothing written past the cap
@@ -1656,7 +1662,7 @@ void test_ai_linters(void) {
 }
 
 
-static void do_test_errMarkup(gs1_encoder* const ctx, const char* const file, const int line, const char* const aiData, const char* const expect) {
+static void do_test_errMarkup(gs1_encoder* const ctx, const char* const file, const int line, const char* const aiData, const char* const expect, const gs1_lint_err_t expect_linterr) {
 
 	char casename[256];
 
@@ -1664,6 +1670,8 @@ static void do_test_errMarkup(gs1_encoder* const ctx, const char* const file, co
 	TEST_CASE(casename);
 
 	TEST_CHECK(gs1_encoder_setAIdataStr(ctx, aiData) == false);	// Linter error expected
+	TEST_CHECK(ctx->err == gs1_encoder_eAI_LINTER_ERROR && ctx->linterErr == expect_linterr);
+	TEST_MSG("Expected linterErr: %d; Got err: %d; linterErr: %d", expect_linterr, ctx->err, ctx->linterErr);
 	TEST_CHECK(strcmp(gs1_encoder_getErrMarkup(ctx), expect) == 0);
 	TEST_MSG("Given: %s; Got: '%s'; Expected: '%s'", aiData, gs1_encoder_getErrMarkup(ctx), expect);
 
@@ -1677,17 +1685,17 @@ void test_ai_errMarkup(void) {
 
 	gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vREQUISITE_AIS, false);
 
-#define test_errMarkup(d, e) do {					\
-	do_test_errMarkup(ctx, __FILE__, __LINE__, d, e);		\
+#define test_errMarkup(d, e, le) do {				\
+	do_test_errMarkup(ctx, __FILE__, __LINE__, d, e, le);	\
 } while (0)
 
 	// AI 8001 = N4 N5 N3 N1 N1; 'X' is valid CSET 82 but not a digit.
 	// Error in the first component: the "after" segment is correct.
-	test_errMarkup("(8001)1X345678901234", "(8001)1|X|34");
+	test_errMarkup("(8001)1X345678901234", "(8001)1|X|34", GS1_LINTER_NON_DIGIT_CHARACTER);
 
 	// Error in a later component: the "after" segment must retain the
 	// trailing data of that component.
-	test_errMarkup("(8001)12341X34567890", "(8001)12341|X|345");
+	test_errMarkup("(8001)12341X34567890", "(8001)12341|X|345", GS1_LINTER_NON_DIGIT_CHARACTER);
 
 #undef test_errMarkup
 
@@ -1695,8 +1703,9 @@ void test_ai_errMarkup(void) {
 
 }
 
-static void do_test_processAIdata(gs1_encoder* const ctx, const char* const file, const int line, const bool should_succeed, const char* const dataStr) {
+static void do_test_processAIdata(gs1_encoder* const ctx, const char* const file, const int line, const gs1_encoder_err_t expect_err, const char* const dataStr) {
 
+	const bool should_succeed = expect_err == gs1_encoder_eNO_ERROR;
 	char casename[256];
 
 	snprintf(casename, sizeof(casename), "%s:%d: %s", file, line, dataStr);
@@ -1704,7 +1713,9 @@ static void do_test_processAIdata(gs1_encoder* const ctx, const char* const file
 
 	// Process and extract AIs
 	TEST_CHECK(gs1_processAIdata(ctx, dataStr, true) ^ (!should_succeed));
-	TEST_MSG(ctx->errMsg);
+	TEST_MSG("%s", ctx->errMsg);
+	TEST_CHECK(ctx->err == expect_err);
+	TEST_MSG("Given: %s; Expected err: %d; Got err: %d (%s)", dataStr, expect_err, ctx->err, ctx->errMsg);
 
 }
 
@@ -1714,101 +1725,101 @@ void test_ai_processAIdata(void) {
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
-#define test_processAIdata(s, d) do {					\
-	do_test_processAIdata(ctx, __FILE__, __LINE__, s, d);		\
+#define test_processAIdata(err, d) do {						\
+	do_test_processAIdata(ctx, __FILE__, __LINE__, gs1_encoder_e##err, d);	\
 } while (0)
 
-	test_processAIdata(false, "");						// No FNC1 in first position
-	test_processAIdata(false, "991234");					// No FNC1 in first position
-	test_processAIdata(false, "^");						// FNC1 in first but no AIs
-	test_processAIdata(false, "^891234");					// No such AI
+	test_processAIdata(MISSING_FNC1_IN_FIRST_POSITION, "");			// No FNC1 in first position
+	test_processAIdata(MISSING_FNC1_IN_FIRST_POSITION, "991234");		// No FNC1 in first position
+	test_processAIdata(AI_DATA_EMPTY, "^");					// FNC1 in first but no AIs
+	test_processAIdata(NO_AI_FOR_PREFIX, "^891234");			// No such AI
 
-	test_processAIdata(true,  "^991234");
+	test_processAIdata(OK, "^991234");
 
-	test_processAIdata(false, "^99~ABC");					// Bad CSET82 character
- 	test_processAIdata(false, "^99ABC~");					// Bad CSET82 character
+	test_processAIdata(AI_LINTER_ERROR, "^99~ABC");				// Bad CSET82 character
+	test_processAIdata(AI_LINTER_ERROR, "^99ABC~");				// Bad CSET82 character
 
-	test_processAIdata(true,  "^0112345678901231");				// N14, no FNC1 required
-	test_processAIdata(false, "^01A2345678901231");				// Bad numeric character
-	test_processAIdata(false, "^011234567890123A");				// Bad numeric character
-	test_processAIdata(false, "^0112345678901234");				// Incorrect check digit (csum linter)
-	test_processAIdata(false, "^011234567890123");				// Too short
-	test_processAIdata(false, "^01123456789012312");			// No such AI (2). Can't be "too long" since FNC1 not required
+	test_processAIdata(OK, "^0112345678901231");				// N14, no FNC1 required
+	test_processAIdata(AI_LINTER_ERROR, "^01A2345678901231");		// Bad numeric character
+	test_processAIdata(AI_LINTER_ERROR, "^011234567890123A");		// Bad numeric character
+	test_processAIdata(AI_LINTER_ERROR, "^0112345678901234");		// Incorrect check digit (csum linter)
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^011234567890123");	// Too short
+	test_processAIdata(NO_AI_FOR_PREFIX, "^01123456789012312");		// No such AI (2). Can't be "too long" since FNC1 not required
 
-	test_processAIdata(true,  "^0112345678901231^");			// Tolerate superfluous FNC1
-	test_processAIdata(false, "^011234567890123^");				// Short, with superfluous FNC1
-	test_processAIdata(false, "^01123456789012345^");			// Long, with superfluous FNC1 (no following AIs)
-	test_processAIdata(false, "^01123456789012345^991234");			// Long, with superfluous FNC1 and meaningless AI (5^..)
+	test_processAIdata(OK, "^0112345678901231^");				// Tolerate superfluous FNC1
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^011234567890123^");	// Short, with superfluous FNC1
+	test_processAIdata(AI_LINTER_ERROR, "^01123456789012345^");		// Long, with superfluous FNC1 (no following AIs)
+	test_processAIdata(AI_LINTER_ERROR, "^01123456789012345^991234");	// Long, with superfluous FNC1 and meaningless AI (5^..)
 
-	test_processAIdata(true,  "^0112345678901231991234");			// Fixed-length, run into next AI (01)...(99)...
-	test_processAIdata(true,  "^0112345678901231^991234");			// Tolerate superfluous FNC1
+	test_processAIdata(OK, "^0112345678901231991234");			// Fixed-length, run into next AI (01)...(99)...
+	test_processAIdata(OK, "^0112345678901231^991234");			// Tolerate superfluous FNC1
 
-	test_processAIdata(true,  "^2421");					// N1..6; FNC1 required
-	test_processAIdata(true,  "^24212");
-	test_processAIdata(true,  "^242123");
-	test_processAIdata(true,  "^2421234");
-	test_processAIdata(true,  "^24212345");
-	test_processAIdata(true,  "^242123456");
-	test_processAIdata(true,  "^242123456^10ABC123");			// Limit, then following AI
-	test_processAIdata(true,  "^242123456^");				// Tolerant of FNC1 at end of data
-	test_processAIdata(false, "^2421234567");				// Data too long
+	test_processAIdata(OK, "^2421");					// N1..6; FNC1 required
+	test_processAIdata(OK, "^24212");
+	test_processAIdata(OK, "^242123");
+	test_processAIdata(OK, "^2421234");
+	test_processAIdata(OK, "^24212345");
+	test_processAIdata(OK, "^242123456");
+	test_processAIdata(OK, "^242123456^10ABC123");				// Limit, then following AI
+	test_processAIdata(OK, "^242123456^");					// Tolerant of FNC1 at end of data
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^2421234567");			// Data too long
 
-	test_processAIdata(true,  "^81111234");					// N4; FNC1 required
-	test_processAIdata(false, "^8111123");					// Too short
-	test_processAIdata(false, "^811112345");				// Too long
-	test_processAIdata(true,  "^81111234^10ABC123");			// Followed by another AI
+	test_processAIdata(OK, "^81111234");					// N4; FNC1 required
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^8111123");		// Too short
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^811112345");			// Too long
+	test_processAIdata(OK, "^81111234^10ABC123");				// Followed by another AI
 
-	test_processAIdata(true,  "^800112341234512398");			// N4-5-3-1-1; FNC1 required
-	test_processAIdata(false, "^80011234123451239");			// Too short
-	test_processAIdata(false, "^8001123412345123981");			// Too long
-	test_processAIdata(true,  "^800112341234512398^0112345678901231");
-	test_processAIdata(false, "^80011234123451239^0112345678901231");	// Too short
-	test_processAIdata(false, "^8001123412345123981^01123456789012312");	// Too long
+	test_processAIdata(OK, "^800112341234512398");							// N4-5-3-1-1; FNC1 required
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^80011234123451239");				// Too short
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^8001123412345123981");				// Too long
+	test_processAIdata(OK, "^800112341234512398^0112345678901231");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^80011234123451239^0112345678901231");	// Too short
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^8001123412345123981^01123456789012312");		// Too long
 
-	test_processAIdata(true,  "^7007211225211231");				// N6 [N6]; FNC1 required
-	test_processAIdata(true,  "^7007211225");				// No optional component
-	test_processAIdata(false, "^70072112252");				// Incorrect length
-	test_processAIdata(false, "^700721122521");				// Incorrect length
-	test_processAIdata(false, "^7007211225211");				// Incorrect length
-	test_processAIdata(false, "^70072112252112");				// Incorrect length
-	test_processAIdata(false, "^700721122521123");				// Incorrect length
-	test_processAIdata(false, "^70072112252212311");			// Too long
+	test_processAIdata(OK, "^7007211225211231");				// N6 [N6]; FNC1 required
+	test_processAIdata(OK, "^7007211225");					// No optional component
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^70072112252");	// Incorrect length
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^700721122521");	// Incorrect length
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^7007211225211");	// Incorrect length
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^70072112252112");	// Incorrect length
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^700721122521123");	// Incorrect length
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^70072112252212311");		// Too long
 
-	test_processAIdata(true,  "^800302112345678900ABC");			// N1 N13,csum X0..16; FNC1 required
-	test_processAIdata(false, "^800302112345678901ABC");			// Bad check digit on N13 component
-	test_processAIdata(true,  "^800302112345678900");			// Empty final component
-	test_processAIdata(true,  "^800302112345678900^10ABC123");		// Empty final component and following AI
-	test_processAIdata(true,  "^800302112345678900ABCDEFGHIJKLMNOP");	// Empty final component and following AI
-	test_processAIdata(false, "^800302112345678900ABCDEFGHIJKLMNOPQ");	// Empty final component and following AI
+	test_processAIdata(OK, "^800302112345678900ABC");					// N1 N13,csum X0..16; FNC1 required
+	test_processAIdata(AI_LINTER_ERROR, "^800302112345678901ABC");				// Bad check digit on N13 component
+	test_processAIdata(OK, "^800302112345678900");						// Empty final component
+	test_processAIdata(OK, "^800302112345678900^10ABC123");					// Empty final component and following AI
+	test_processAIdata(OK, "^800302112345678900ABCDEFGHIJKLMNOP");				// Empty final component and following AI
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^800302112345678900ABCDEFGHIJKLMNOPQ");	// Empty final component and following AI
 
-	test_processAIdata(true,  "^7230121234567890123456789012345678");	// X2 X1..28; FNC1 required
-	test_processAIdata(false, "^72301212345678901234567890123456789");	// Too long
-	test_processAIdata(true,  "^7230123");					// Shortest
-	test_processAIdata(false, "^723012");					// Too short
+	test_processAIdata(OK, "^7230121234567890123456789012345678");				// X2 X1..28; FNC1 required
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^72301212345678901234567890123456789");	// Too long
+	test_processAIdata(OK, "^7230123");							// Shortest
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^723012");				// Too short
 
-	test_processAIdata(true,  "^235ABC");					// X..28; FNC1 required
-	test_processAIdata(true,  "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ12");		// X..28 at max
-	test_processAIdata(false, "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ123");		// Over max
-	test_processAIdata(true,  "^0112345678901231235XYZ");			// (01) NO_FNC1 -> no ^ before 235
-	test_processAIdata(true,  "^0112345678901231235XYZ^10BATCH");		// (235) DO_FNC1 -> ^ before next AI
+	test_processAIdata(OK, "^235ABC");						// X..28; FNC1 required
+	test_processAIdata(OK, "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ12");			// X..28 at max
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^235ABCDEFGHIJKLMNOPQRSTUVWXYZ123");	// Over max
+	test_processAIdata(OK, "^0112345678901231235XYZ");				// (01) NO_FNC1 -> no ^ before 235
+	test_processAIdata(OK, "^0112345678901231235XYZ^10BATCH");			// (235) DO_FNC1 -> ^ before next AI
 
-	test_processAIdata(false, "^423");					// List of 3-digit ISO-3166 codes
-	test_processAIdata(false, "^4235");
-	test_processAIdata(false, "^42352");
-	test_processAIdata(true,  "^423528");
-	test_processAIdata(false, "^4235285");
-	test_processAIdata(false, "^42352852");
-	test_processAIdata(true,  "^423528528");
-	test_processAIdata(false, "^4235285285");
-	test_processAIdata(false, "^42352852852");
-	test_processAIdata(true,  "^423528528528");
-	test_processAIdata(false, "^4235285285285");
-	test_processAIdata(false, "^42352852852852");
-	test_processAIdata(true,  "^423528528528528");
-	test_processAIdata(false, "^4235285285285285");
-	test_processAIdata(false, "^42352852852852852");
-	test_processAIdata(true,  "^423528528528528528");
-	test_processAIdata(false,  "^4235285285285285285");			// Too long
+	test_processAIdata(AI_DATA_IS_EMPTY, "^423");				// List of 3-digit ISO-3166 codes
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^4235");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^42352");
+	test_processAIdata(OK, "^423528");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^4235285");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^42352852");
+	test_processAIdata(OK, "^423528528");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^4235285285");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^42352852852");
+	test_processAIdata(OK, "^423528528528");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^4235285285285");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^42352852852852");
+	test_processAIdata(OK, "^423528528528528");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^4235285285285285");
+	test_processAIdata(AI_DATA_HAS_INCORRECT_LENGTH, "^42352852852852852");
+	test_processAIdata(OK, "^423528528528528528");
+	test_processAIdata(AI_DATA_IS_TOO_LONG, "^4235285285285285285");	// Too long
 
 
 	/*
@@ -1826,14 +1837,14 @@ void test_ai_processAIdata(void) {
 		for (j = 0; j < 90; j++)
 			buf[3 + j] = 'A';
 		buf[93] = '\0';
-		test_processAIdata(true, buf);				// Exactly 90 chars
+		test_processAIdata(OK, buf);				// Exactly 90 chars
 
 		ctx->numAIs = 0;
 		ctx->numSortedAIs = 0;
 
 		buf[94] = '\0';
 		buf[93] = 'A';
-		test_processAIdata(false, buf);				// 91 chars, too long
+		test_processAIdata(AI_DATA_IS_TOO_LONG, buf);		// 91 chars, too long
 	}
 
 
@@ -1862,7 +1873,7 @@ void test_ai_processAIdata(void) {
 			*p++ = 'X'; *p++ = 'Y';
 		}
 		*p = '\0';
-		test_processAIdata(true, buf);				// Exactly 64 AIs
+		test_processAIdata(OK, buf);				// Exactly 64 AIs
 
 		ctx->numAIs = 0;
 		ctx->numSortedAIs = 0;
@@ -1871,14 +1882,14 @@ void test_ai_processAIdata(void) {
 		*p++ = '^';
 		*p++ = '9'; *p++ = '9'; *p++ = 'X'; *p++ = 'Y';
 		*p = '\0';
-		test_processAIdata(false, buf);				// 65 AIs, too many
+		test_processAIdata(TOO_MANY_AIS, buf);			// 65 AIs, too many
 	}
 
 
 	// Unlike parsed data input, we cannot vivify unknown AIs when
 	// extracting AI data from a raw string
 	gs1_encoder_setPermitUnknownAIs(ctx, true);
-	test_processAIdata(false, "^891234");
+	test_processAIdata(NO_AI_FOR_PREFIX, "^891234");
 
 #undef test_processAIdata
 
@@ -1886,8 +1897,9 @@ void test_ai_processAIdata(void) {
 
 }
 
-static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, const int line, const bool should_succeed, gs1_encoder_validation_func_t fn, const char* const aiData) {
+static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, const int line, const gs1_encoder_err_t expect_err, gs1_encoder_validation_func_t fn, const char* const aiData) {
 
+	const bool should_succeed = expect_err == gs1_encoder_eNO_ERROR;
 	bool ret;
 	char out[256];
 	char casename[256];
@@ -1906,6 +1918,8 @@ static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, 
 
 	if (!should_succeed) {
 		TEST_CHECK(!fn(ctx));
+		TEST_CHECK(ctx->err == expect_err);
+		TEST_MSG("Given: %s; Expected err: %d; Got err: %d (%s)", aiData, expect_err, ctx->err, ctx->errMsg);
 		return;
 	}
 
@@ -2010,6 +2024,7 @@ void test_ai_predefinedLength(void) {
 	if (ctx) {
 		TEST_CHECK( gs1_encoder_setAIdataStr(ctx, "(23)4567890123(10)A"));	// n=4, formula=10 == max
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, "(23)567890123456(10)A"));	// n=5, formula=12 > max
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_VALUE_IS_TOO_LONG);
 		gs1_encoder_free(ctx);
 	}
 
@@ -2023,6 +2038,7 @@ void test_ai_predefinedLength(void) {
 	if (ctx) {
 		TEST_CHECK( gs1_encoder_setAIdataStr(ctx, "(23)1234(10)A"));		// 4 chars: fits N4
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, "(23)123456(10)A"));		// 6 chars: too long for N4
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_VALUE_IS_TOO_LONG);
 		gs1_encoder_free(ctx);
 	}
 
@@ -2048,8 +2064,8 @@ void test_ai_validateAIs(void) {
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);
 
-#define test_validateAIs(s, f, d) do {					\
-	do_test_validateAIs(ctx, __FILE__, __LINE__, s, f, d);		\
+#define test_validateAIs(err, f, d) do {					\
+	do_test_validateAIs(ctx, __FILE__, __LINE__, gs1_encoder_e##err, f, d);	\
 } while (0)
 
 	gs1_encoder_setPermitUnknownAIs(ctx, true);
@@ -2059,45 +2075,45 @@ void test_ai_validateAIs(void) {
 	 * Test for repeated attributes
 	 *
 	 */
-	test_validateAIs(true,  validateAIrepeats, "(400)ABC");
-	test_validateAIs(true,  validateAIrepeats, "(400)ABC(400)ABC");
-	test_validateAIs(true,  validateAIrepeats, "(400)ABC(99)DEF(400)ABC");
-	test_validateAIs(true,  validateAIrepeats, "(99)ABC(400)XYZ(400)XYZ");
-	test_validateAIs(false, validateAIrepeats, "(400)ABC(400)AB");
-	test_validateAIs(false, validateAIrepeats, "(400)ABC(400)ABCD");
-	test_validateAIs(false, validateAIrepeats, "(400)ABC(400)ABC(400)XYZ");
-	test_validateAIs(false, validateAIrepeats, "(400)ABC(400)XYZ(400)ABC");
-	test_validateAIs(false, validateAIrepeats, "(400)ABC(400)XYZ(400)XYZ");
-	test_validateAIs(false, validateAIrepeats, "(400)ABC(99)DEF(400)XYZ");
-	test_validateAIs(false, validateAIrepeats, "(99)ABC(400)ABC(400)XYZ");
-	test_validateAIs(true,  validateAIrepeats, "(89)ABC(89)ABC(89)ABC");
-	test_validateAIs(false, validateAIrepeats, "(89)ABC(89)ABC(89)XYZ");
-	test_validateAIs(false, validateAIrepeats, "(89)ABC(89)XYZ(89)ABC");
-	test_validateAIs(false, validateAIrepeats, "(89)ABC(89)XYZ(89)XYZ");
-	test_validateAIs(false, validateAIrepeats, "(89)ABC(89)AB(89)ABC");
-	test_validateAIs(false, validateAIrepeats, "(89)ABC(89)ABCD(89)ABC");
+	test_validateAIs(OK, validateAIrepeats, "(400)ABC");
+	test_validateAIs(OK, validateAIrepeats, "(400)ABC(400)ABC");
+	test_validateAIs(OK, validateAIrepeats, "(400)ABC(99)DEF(400)ABC");
+	test_validateAIs(OK, validateAIrepeats, "(99)ABC(400)XYZ(400)XYZ");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(400)ABC(400)AB");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(400)ABC(400)ABCD");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(400)ABC(400)ABC(400)XYZ");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(400)ABC(400)XYZ(400)ABC");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(400)ABC(400)XYZ(400)XYZ");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(400)ABC(99)DEF(400)XYZ");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(99)ABC(400)ABC(400)XYZ");
+	test_validateAIs(OK, validateAIrepeats, "(89)ABC(89)ABC(89)ABC");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(89)ABC(89)ABC(89)XYZ");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(89)ABC(89)XYZ(89)ABC");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(89)ABC(89)XYZ(89)XYZ");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(89)ABC(89)AB(89)ABC");
+	test_validateAIs(INSTANCES_OF_AI_HAVE_DIFFERENT_VALUES, validateAIrepeats, "(89)ABC(89)ABCD(89)ABC");
 
 
 	/*
 	 * "Ex" attribute
 	 *
 	 */
-	test_validateAIs(false, validateAImutex, "(01)12345678901231(02)12345678901231");
-	test_validateAIs(false, validateAImutex, "(99)ABC123(01)12345678901231(02)12345678901231");
-	test_validateAIs(false, validateAImutex, "(01)12345678901231(99)ABC123(02)12345678901231");
-	test_validateAIs(false, validateAImutex, "(01)12345678901231(02)12345678901231(99)ABC123");
-	test_validateAIs(false, validateAImutex, "(01)12345678901231(255)5412345000150");
-	test_validateAIs(false, validateAImutex, "(01)12345678901231(37)123");
-	test_validateAIs(false, validateAImutex, "(21)ABC123(235)XYZ");
-	test_validateAIs(false, validateAImutex, "(3940)1234(8111)9999");
-	test_validateAIs(false, validateAImutex, "(3940)1234(3941)9999");	// Match by "394n", ignoring self
-	test_validateAIs(false, validateAImutex, "(3955)123456(3929)123");	// Match by "392n"
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(01)12345678901231(02)12345678901231");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(99)ABC123(01)12345678901231(02)12345678901231");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(01)12345678901231(99)ABC123(02)12345678901231");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(01)12345678901231(02)12345678901231(99)ABC123");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(01)12345678901231(255)5412345000150");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(01)12345678901231(37)123");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(21)ABC123(235)XYZ");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(3940)1234(8111)9999");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(3940)1234(3941)9999");	// Match by "394n", ignoring self
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(3955)123456(3929)123");	// Match by "392n"
 
 	// Mutex between known and unknown AIs: (3333) ex=333n should conflict with unknown (3338)
-	test_validateAIs(false, validateAImutex, "(3333)333333(3338)030333");
-	test_validateAIs(false, validateAImutex, "(01)12345678901231(3333)333333(3338)030333");
-	test_validateAIs(false, validateAImutex, "(3338)030333(3333)333333");
-	test_validateAIs(false, validateAImutex, "(3300)000000(3333)333333(3338)030333");	// Extra 33xx AI shifts sort order
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(3333)333333(3338)030333");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(01)12345678901231(3333)333333(3338)030333");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(3338)030333(3333)333333");
+	test_validateAIs(INVALID_AI_PAIRS, validateAImutex, "(3300)000000(3333)333333(3338)030333");	// Extra 33xx AI shifts sort order
 
 
 	/*
@@ -2106,51 +2122,51 @@ void test_ai_validateAIs(void) {
 	 */
 
 	// (02) req=37; (37) req=02,8026
-	test_validateAIs(false, validateAIrequisites, "(02)12345678901231");
-	test_validateAIs(false, validateAIrequisites, "(02)12345678901231(37)123");
-	test_validateAIs(false, validateAIrequisites, "(99)AAA(02)12345678901231(37)123");
-	test_validateAIs(false, validateAIrequisites, "(02)12345678901231(99)AAA(37)123");
-	test_validateAIs(false, validateAIrequisites, "(02)12345678901231(37)123(99)AAA");
-	test_validateAIs(true,  validateAIrequisites, "(02)12345678901231(37)123(00)123456789012345675");
-	test_validateAIs(true,  validateAIrequisites, "(91)XXX(02)12345678901231(92)YYY(37)123(93)ZZZ(00)123456789012345675");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(02)12345678901231");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(02)12345678901231(37)123");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(99)AAA(02)12345678901231(37)123");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(02)12345678901231(99)AAA(37)123");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(02)12345678901231(37)123(99)AAA");
+	test_validateAIs(OK, validateAIrequisites, "(02)12345678901231(37)123(00)123456789012345675");
+	test_validateAIs(OK, validateAIrequisites, "(91)XXX(02)12345678901231(92)YYY(37)123(93)ZZZ(00)123456789012345675");
 
 	// (21) req=01,8006
-	test_validateAIs(false, validateAIrequisites, "(21)ABC123");
-	test_validateAIs(true,  validateAIrequisites, "(21)ABC123(01)12345678901231");
-	test_validateAIs(true,  validateAIrequisites, "(21)ABC123(8006)123456789012310510");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(21)ABC123");
+	test_validateAIs(OK, validateAIrequisites, "(21)ABC123(01)12345678901231");
+	test_validateAIs(OK, validateAIrequisites, "(21)ABC123(8006)123456789012310510");
 
 	// (250) req=01,8006 req=21
-	test_validateAIs(false, validateAIrequisites, "(01)12345678901231(250)ABC123");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(21)XYZ999(250)ABC123");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(01)12345678901231(250)ABC123");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(21)XYZ999(250)ABC123");
 
 	// (392n) req=01 req=30,31nn,32nn,35nn,36nn
-	test_validateAIs(false, validateAIrequisites, "(01)12345678901231(3925)12599");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(30)123");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3100)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3105)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3160)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3165)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3295)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3500)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3575)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3600)654321");
-	test_validateAIs(true,  validateAIrequisites, "(01)12345678901231(3925)12599(3695)654321");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(01)12345678901231(3925)12599");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(30)123");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3100)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3105)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3160)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3165)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3295)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3500)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3575)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3600)654321");
+	test_validateAIs(OK, validateAIrequisites, "(01)12345678901231(3925)12599(3695)654321");
 
 	// (8030) req=00,01+21,253,255,8003,8004,8006+21,8010+8011,8017,8018
-	test_validateAIs(false, validateAIrequisites, "(8030)DIGSIG");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(00)123456789012345675");
-	test_validateAIs(false, validateAIrequisites, "(8030)DIGSIG(01)12345678901231");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(01)12345678901231(21)ABC123");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(253)1234567890128X");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(255)12345678901280");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(8003)01234567890128X");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(8004)01234567890");
-	test_validateAIs(false, validateAIrequisites, "(8030)DIGSIG(8006)123456789012310102");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(8006)123456789012310102(21)ABC123");
-	test_validateAIs(false, validateAIrequisites, "(8030)DIGSIG(8010)1234567890");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(8010)1234567890(8011)123456789012");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(8017)123456789012345675");
-	test_validateAIs(true,  validateAIrequisites, "(8030)DIGSIG(8018)123456789012345675");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(8030)DIGSIG");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(00)123456789012345675");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(8030)DIGSIG(01)12345678901231");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(01)12345678901231(21)ABC123");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(253)1234567890128X");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(255)12345678901280");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(8003)01234567890128X");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(8004)01234567890");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(8030)DIGSIG(8006)123456789012310102");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(8006)123456789012310102(21)ABC123");
+	test_validateAIs(REQUIRED_AIS_NOT_SATISFIED, validateAIrequisites, "(8030)DIGSIG(8010)1234567890");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(8010)1234567890(8011)123456789012");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(8017)123456789012345675");
+	test_validateAIs(OK, validateAIrequisites, "(8030)DIGSIG(8018)123456789012345675");
 
 
 	/*
@@ -2158,17 +2174,17 @@ void test_ai_validateAIs(void) {
 	 *
 	 */
 
-	test_validateAIs(true,  validateDigSigRequiresSerialisedKey, "(253)1234567890128");
-	test_validateAIs(false, validateDigSigRequiresSerialisedKey, "(253)1234567890128(8030)ABC123");
-	test_validateAIs(true,  validateDigSigRequiresSerialisedKey, "(253)1234567890128X(8030)ABC123");
+	test_validateAIs(OK, validateDigSigRequiresSerialisedKey, "(253)1234567890128");
+	test_validateAIs(SERIAL_NOT_PRESENT, validateDigSigRequiresSerialisedKey, "(253)1234567890128(8030)ABC123");
+	test_validateAIs(OK, validateDigSigRequiresSerialisedKey, "(253)1234567890128X(8030)ABC123");
 
-	test_validateAIs(true,  validateDigSigRequiresSerialisedKey, "(255)1234567890128");
-	test_validateAIs(false, validateDigSigRequiresSerialisedKey, "(255)1234567890128(8030)ABC123");
-	test_validateAIs(true,  validateDigSigRequiresSerialisedKey, "(255)12345678901280(8030)ABC123");
+	test_validateAIs(OK, validateDigSigRequiresSerialisedKey, "(255)1234567890128");
+	test_validateAIs(SERIAL_NOT_PRESENT, validateDigSigRequiresSerialisedKey, "(255)1234567890128(8030)ABC123");
+	test_validateAIs(OK, validateDigSigRequiresSerialisedKey, "(255)12345678901280(8030)ABC123");
 
-	test_validateAIs(true,  validateDigSigRequiresSerialisedKey, "(8003)01234567890128");
-	test_validateAIs(false, validateDigSigRequiresSerialisedKey, "(8003)01234567890128(8030)ABC123");
-	test_validateAIs(true,  validateDigSigRequiresSerialisedKey, "(8003)01234567890128X(8030)ABC123");
+	test_validateAIs(OK, validateDigSigRequiresSerialisedKey, "(8003)01234567890128");
+	test_validateAIs(SERIAL_NOT_PRESENT, validateDigSigRequiresSerialisedKey, "(8003)01234567890128(8030)ABC123");
+	test_validateAIs(OK, validateDigSigRequiresSerialisedKey, "(8003)01234567890128X(8030)ABC123");
 
 #undef test_validateAIs
 

@@ -616,7 +616,7 @@ void test_scandata_validateParity(void) {
 }
 
 
-static void do_test_testGenerateScanData(gs1_encoder* const ctx, const char* const file, const int line, const char* const name, const gs1_encoder_symbologies_t sym, const char* const dataStr, const char* const expect) {
+static void do_test_testGenerateScanData(gs1_encoder* const ctx, const char* const file, const int line, const gs1_encoder_err_t expect_err, const char* const name, const gs1_encoder_symbologies_t sym, const char* const dataStr, const char* const expect) {
 
 	char *out;
 	char casename[256];
@@ -627,6 +627,8 @@ static void do_test_testGenerateScanData(gs1_encoder* const ctx, const char* con
 	TEST_ASSERT(gs1_encoder_setSym(ctx, sym));
 	TEST_ASSERT(gs1_encoder_setDataStr(ctx, dataStr));
 	out = gs1_generateScanData(ctx);
+	TEST_CHECK(ctx->err == expect_err);
+	TEST_MSG("Given: %s; Expected err: %d; Got err: %d (%s)", dataStr, expect_err, ctx->err, ctx->errMsg);
 	if (!expect) {
 		TEST_CHECK(out == NULL);
 		TEST_MSG("Given: %s; Got: %s; Expected: NULL", dataStr, out);
@@ -646,93 +648,93 @@ void test_scandata_generateScanData(void) {
 
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 
-#define test_testGenerateScanData(n, d, e) do {							\
-	do_test_testGenerateScanData(ctx, __FILE__, __LINE__, #n, gs1_encoder_s##n, d, e);	\
+#define test_testGenerateScanData(err, n, d, e) do {								\
+	do_test_testGenerateScanData(ctx, __FILE__, __LINE__, gs1_encoder_e##err, #n, gs1_encoder_s##n, d, e);	\
 } while (0)
 
-	test_testGenerateScanData(NONE, "", NULL);
-	test_testGenerateScanData(NONE, "TESTING", NULL);
+	test_testGenerateScanData(NO_SYMBOLOGY_SELECTED, NONE, "", NULL);
+	test_testGenerateScanData(NO_SYMBOLOGY_SELECTED, NONE, "TESTING", NULL);
 
 	/* QR */
-	test_testGenerateScanData(QR, "TESTING", "]Q1TESTING");
-	test_testGenerateScanData(QR, "\\^TESTING", "]Q1^TESTING");		// Escaped data "^" character
-	test_testGenerateScanData(QR, "\\\\^TESTING", "]Q1\\^TESTING");		// Escaped data "\^" characters
-	test_testGenerateScanData(QR, "^011231231231233310ABC123^99TESTING",
+	test_testGenerateScanData(OK, QR, "TESTING", "]Q1TESTING");
+	test_testGenerateScanData(OK, QR, "\\^TESTING", "]Q1^TESTING");		// Escaped data "^" character
+	test_testGenerateScanData(OK, QR, "\\\\^TESTING", "]Q1\\^TESTING");	// Escaped data "\^" characters
+	test_testGenerateScanData(OK, QR, "^011231231231233310ABC123^99TESTING",
 		"]Q3011231231231233310ABC123" "\x1D" "99TESTING");
-	test_testGenerateScanData(QR, "^011231231231233310ABC123^99TESTING^",
+	test_testGenerateScanData(OK, QR, "^011231231231233310ABC123^99TESTING^",
 		"]Q3011231231231233310ABC123" "\x1D" "99TESTING" "\x1D");	// Trailing FNC1 is not stripped
 
 	/* DM */
-	test_testGenerateScanData(DM, "TESTING", "]d1TESTING");
-	test_testGenerateScanData(DM, "\\^TESTING", "]d1^TESTING");		// Escaped data "^" character
-	test_testGenerateScanData(DM, "\\\\^TESTING", "]d1\\^TESTING");		// Escaped data "\^" characters
-	test_testGenerateScanData(DM, "^011231231231233310ABC123^99TESTING",
+	test_testGenerateScanData(OK, DM, "TESTING", "]d1TESTING");
+	test_testGenerateScanData(OK, DM, "\\^TESTING", "]d1^TESTING");		// Escaped data "^" character
+	test_testGenerateScanData(OK, DM, "\\\\^TESTING", "]d1\\^TESTING");	// Escaped data "\^" characters
+	test_testGenerateScanData(OK, DM, "^011231231231233310ABC123^99TESTING",
 		"]d2011231231231233310ABC123" "\x1D" "99TESTING");
-	test_testGenerateScanData(DM, "^011231231231233310ABC123^99TESTING^",
+	test_testGenerateScanData(OK, DM, "^011231231231233310ABC123^99TESTING^",
 		"]d2011231231231233310ABC123" "\x1D" "99TESTING" "\x1D");	// Trailing FNC1 is not stripped
 
 	/* DotCode */
-	test_testGenerateScanData(DotCode, "TESTING", "]J0TESTING");
-	test_testGenerateScanData(DotCode, "\\^TESTING", "]J0^TESTING");	// Escaped data "^" character
-	test_testGenerateScanData(DotCode, "\\\\^TESTING", "]J0\\^TESTING");	// Escaped data "\^" characters
-	test_testGenerateScanData(DotCode, "^011231231231233310ABC123^99TESTING",
+	test_testGenerateScanData(OK, DotCode, "TESTING", "]J0TESTING");
+	test_testGenerateScanData(OK, DotCode, "\\^TESTING", "]J0^TESTING");		// Escaped data "^" character
+	test_testGenerateScanData(OK, DotCode, "\\\\^TESTING", "]J0\\^TESTING");	// Escaped data "\^" characters
+	test_testGenerateScanData(OK, DotCode, "^011231231231233310ABC123^99TESTING",
 		"]J1011231231231233310ABC123" "\x1D" "99TESTING");
-	test_testGenerateScanData(DotCode, "^011231231231233310ABC123^99TESTING^",
+	test_testGenerateScanData(OK, DotCode, "^011231231231233310ABC123^99TESTING^",
 		"]J1011231231231233310ABC123" "\x1D" "99TESTING" "\x1D");	// Trailing FNC1 is not stripped
 
 	/* DataBar Expanded */
-	test_testGenerateScanData(DataBarExpanded, "^011231231231233310ABC123^99TESTING",
+	test_testGenerateScanData(OK, DataBarExpanded, "^011231231231233310ABC123^99TESTING",
 		"]e0011231231231233310ABC123" "\x1D" "99TESTING");
-	test_testGenerateScanData(DataBarExpanded, 				// ... Variable-length AI | Composite
+	test_testGenerateScanData(OK, DataBarExpanded,				// ... Variable-length AI | Composite
 		"^011231231231233310ABC123^99TESTING|^98COMPOSITE^97XYZ",
 		"]e0011231231231233310ABC123" "\x1D" "99TESTING" "\x1D" "98COMPOSITE" "\x1D" "97XYZ");
-	test_testGenerateScanData(DataBarExpanded,				// ... Fixed-Length AI | Composite
+	test_testGenerateScanData(OK, DataBarExpanded,				// ... Fixed-Length AI | Composite
 		"^011231231231233310ABC123^11991225|^98COMPOSITE^97XYZ",
 		"]e0011231231231233310ABC123" "\x1D" "1199122598COMPOSITE" "\x1D" "97XYZ");
 
-	test_testGenerateScanData(GS1_128_CCA, "^011231231231233310ABC123^99TESTING",
+	test_testGenerateScanData(OK, GS1_128_CCA, "^011231231231233310ABC123^99TESTING",
 		"]C1011231231231233310ABC123" "\x1D" "99TESTING");
-	test_testGenerateScanData(GS1_128_CCA,					// Composite uses ]e0
+	test_testGenerateScanData(OK, GS1_128_CCA,				// Composite uses ]e0
 		"^011231231231233310ABC123^99TESTING|^98COMPOSITE^97XYZ",
 		"]e0011231231231233310ABC123" "\x1D" "99TESTING" "\x1D" "98COMPOSITE" "\x1D" "97XYZ");
-	test_testGenerateScanData(GS1_128_CCC,					// Composite uses ]e0
+	test_testGenerateScanData(OK, GS1_128_CCC,				// Composite uses ]e0
 		"^011231231231233310ABC123^99TESTING|^98COMPOSITE^97XYZ",
 		"]e0011231231231233310ABC123" "\x1D" "99TESTING" "\x1D" "98COMPOSITE" "\x1D" "97XYZ");
 
 	/* DataBar OmniDirectional */
-	test_testGenerateScanData(DataBarOmni, "^0124012345678905|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, DataBarOmni, "^0124012345678905|^99COMPOSITE^98XYZ",
 		"]e0012401234567890599COMPOSITE" "\x1D" "98XYZ");
-	test_testGenerateScanData(DataBarOmni, "24012345678905|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, DataBarOmni, "24012345678905|^99COMPOSITE^98XYZ",
 		"]e0012401234567890599COMPOSITE" "\x1D" "98XYZ");
 
 	/* DataBar Limited */
-	test_testGenerateScanData(DataBarLimited, "^0115012345678907|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, DataBarLimited, "^0115012345678907|^99COMPOSITE^98XYZ",
 		"]e0011501234567890799COMPOSITE" "\x1D" "98XYZ");
-	test_testGenerateScanData(DataBarLimited, "15012345678907|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, DataBarLimited, "15012345678907|^99COMPOSITE^98XYZ",
 		"]e0011501234567890799COMPOSITE" "\x1D" "98XYZ");
 
 	/* UPC-A */
-	test_testGenerateScanData(UPCA, "^0100416000336108|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, UPCA, "^0100416000336108|^99COMPOSITE^98XYZ",
 		"]E00416000336108|]e099COMPOSITE" "\x1D" "98XYZ");
-	test_testGenerateScanData(UPCA, "416000336108|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, UPCA, "416000336108|^99COMPOSITE^98XYZ",
 		"]E00416000336108|]e099COMPOSITE" "\x1D" "98XYZ");
 
 	/* UPC-E */
-	test_testGenerateScanData(UPCE, "^0100001234000057|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, UPCE, "^0100001234000057|^99COMPOSITE^98XYZ",
 		"]E00001234000057|]e099COMPOSITE" "\x1D" "98XYZ");
-	test_testGenerateScanData(UPCE, "001234000057|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, UPCE, "001234000057|^99COMPOSITE^98XYZ",
 		"]E00001234000057|]e099COMPOSITE" "\x1D" "98XYZ");
 
 	/* EAN-13 */
-	test_testGenerateScanData(EAN13, "^0102112345678900|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, EAN13, "^0102112345678900|^99COMPOSITE^98XYZ",
 		"]E02112345678900|]e099COMPOSITE" "\x1D" "98XYZ");
-	test_testGenerateScanData(EAN13, "2112345678900|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, EAN13, "2112345678900|^99COMPOSITE^98XYZ",
 		"]E02112345678900|]e099COMPOSITE" "\x1D" "98XYZ");
 
 	/* EAN-8 */
-	test_testGenerateScanData(EAN8, "^0100000002345673|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, EAN8, "^0100000002345673|^99COMPOSITE^98XYZ",
 		"]E402345673|]e099COMPOSITE" "\x1D" "98XYZ");
-	test_testGenerateScanData(EAN8, "02345673|^99COMPOSITE^98XYZ",
+	test_testGenerateScanData(OK, EAN8, "02345673|^99COMPOSITE^98XYZ",
 		"]E402345673|]e099COMPOSITE" "\x1D" "98XYZ");
 
 
@@ -742,18 +744,18 @@ void test_scandata_generateScanData(void) {
 	 */
 
 	/* Wrong-length primary data */
-	test_testGenerateScanData(EAN13, "2112345678", NULL);		// Too short for 13-digit EAN-13
+	test_testGenerateScanData(PRIMARY_DATA_MUST_BE_N_DIGITS, EAN13, "2112345678", NULL);	// Too short for 13-digit EAN-13
 
 	/* Non-digit primary data */
-	test_testGenerateScanData(EAN13, "ABCDEFGHIJKLM", NULL);
+	test_testGenerateScanData(PRIMARY_DATA_MUST_BE_ALL_DIGITS, EAN13, "ABCDEFGHIJKLM", NULL);
 
 	/* Bad check digit */
-	test_testGenerateScanData(EAN13, "2112345678901", NULL);	// Wrong check digit (correct: 2112345678900)
+	test_testGenerateScanData(PRIMARY_DATA_CHECK_DIGIT_IS_INCORRECT, EAN13, "2112345678901", NULL);	// Wrong check digit (correct: 2112345678900)
 
 	/* addCheckDigit: wrong-length data */
 	gs1_encoder_setAddCheckDigit(ctx, true);
-	test_testGenerateScanData(EAN13, "2112345678", NULL);		// Too short for addCheckDigit (needs 12)
-	test_testGenerateScanData(EAN13, "2112345678901", NULL);	// Too long for addCheckDigit (needs 12)
+	test_testGenerateScanData(PRIMARY_DATA_MUST_BE_N_DIGITS_WITHOUT_CHECK_DIGIT, EAN13, "2112345678", NULL);	// Too short for addCheckDigit (needs 12)
+	test_testGenerateScanData(PRIMARY_DATA_MUST_BE_N_DIGITS_WITHOUT_CHECK_DIGIT, EAN13, "2112345678901", NULL);	// Too long for addCheckDigit (needs 12)
 	gs1_encoder_setAddCheckDigit(ctx, false);
 
 
@@ -763,16 +765,16 @@ void test_scandata_generateScanData(void) {
 	 */
 
 	/* QR plain data with CC delimiter: pipe is restored (lines 252-256) */
-	test_testGenerateScanData(QR, "TESTING|^99XYZ", "]Q1TESTING|^99XYZ");
+	test_testGenerateScanData(OK, QR, "TESTING|^99XYZ", "]Q1TESTING|^99XYZ");
 
 	/* GS1-128 linear-only with plain data (no ^ prefix) fails (lines 270-271) */
-	test_testGenerateScanData(GS1_128_CCA, "PLAINDATA", NULL);
+	test_testGenerateScanData(MISSING_FNC1_IN_FIRST_POSITION, GS1_128_CCA, "PLAINDATA", NULL);
 
 	/* DataBar Expanded with plain data (no ^ prefix) fails (lines 285-286) */
-	test_testGenerateScanData(DataBarExpanded, "PLAINDATA", NULL);
+	test_testGenerateScanData(MISSING_FNC1_IN_FIRST_POSITION, DataBarExpanded, "PLAINDATA", NULL);
 
 	/* DataBar Limited primary data too large (first digit >= '2') */
-	test_testGenerateScanData(DataBarLimited, "20000000000004", NULL);
+	test_testGenerateScanData(PRIMARY_DATA_IS_TOO_LARGE, DataBarLimited, "20000000000004", NULL);
 
 	/*
 	 *  Composite with plain CC (no ^ prefix): bypasses setDataStr
@@ -787,24 +789,28 @@ void test_scandata_generateScanData(void) {
 		strcpy(ctx->dataStr, "24012345678905|PLAINCC");
 		out = gs1_generateScanData(ctx);
 		TEST_CHECK(out == NULL);
+		TEST_CHECK(ctx->err == gs1_encoder_eMISSING_FNC1_IN_FIRST_POSITION);
 
 		/* EAN-13 composite with plain CC */
 		TEST_ASSERT(gs1_encoder_setSym(ctx, gs1_encoder_sEAN13));
 		strcpy(ctx->dataStr, "2112345678900|PLAINCC");
 		out = gs1_generateScanData(ctx);
 		TEST_CHECK(out == NULL);
+		TEST_CHECK(ctx->err == gs1_encoder_eMISSING_FNC1_IN_FIRST_POSITION);
 
 		/* GS1-128 composite with plain CC (line 298) */
 		TEST_ASSERT(gs1_encoder_setSym(ctx, gs1_encoder_sGS1_128_CCA));
 		strcpy(ctx->dataStr, "^0112312312312333|PLAINCC");
 		out = gs1_generateScanData(ctx);
 		TEST_CHECK(out == NULL);
+		TEST_CHECK(ctx->err == gs1_encoder_eMISSING_FNC1_IN_FIRST_POSITION);
 
 		/* DataBar Omni with bad primary data (line 336) */
 		TEST_ASSERT(gs1_encoder_setSym(ctx, gs1_encoder_sDataBarOmni));
 		strcpy(ctx->dataStr, "SHORT");
 		out = gs1_generateScanData(ctx);
 		TEST_CHECK(out == NULL);
+		TEST_CHECK(ctx->err == gs1_encoder_ePRIMARY_DATA_MUST_BE_N_DIGITS);
 	}
 
 	/*
@@ -812,7 +818,7 @@ void test_scandata_generateScanData(void) {
 	 *
 	 */
 	gs1_encoder_setAddCheckDigit(ctx, true);
-	test_testGenerateScanData(EAN13, "211234567890", "]E02112345678900");	// Check digit computed from '-' placeholder
+	test_testGenerateScanData(OK, EAN13, "211234567890", "]E02112345678900");	// Check digit computed from '-' placeholder
 	gs1_encoder_setAddCheckDigit(ctx, false);
 
 #undef test_testGenerateScanData
@@ -822,9 +828,10 @@ void test_scandata_generateScanData(void) {
 }
 
 
-static void do_test_testProcessScanData(gs1_encoder* const ctx, const char* const file, const int line, const bool should_succeed, const char* const scanData,
+static void do_test_testProcessScanData(gs1_encoder* const ctx, const char* const file, const int line, const gs1_encoder_err_t expect_err, const char* const scanData,
 		const char* const expectSymName, const gs1_encoder_symbologies_t expectSym, const char* const expectDataStr) {
 
+	const bool should_succeed = expect_err == gs1_encoder_eNO_ERROR;
 	char casename[256];
 
 	snprintf(casename, sizeof(casename), "%s:%d: %s", file, line, scanData);
@@ -832,6 +839,8 @@ static void do_test_testProcessScanData(gs1_encoder* const ctx, const char* cons
 
 	TEST_CHECK(gs1_processScanData(ctx, scanData) ^ (!should_succeed));
 	TEST_MSG("Error message: %s", ctx->errMsg);
+	TEST_CHECK(ctx->err == expect_err);
+	TEST_MSG("Given: %s; Expected err: %d; Got err: %d (%s)", scanData, expect_err, ctx->err, ctx->errMsg);
 	TEST_CHECK(ctx->sym == expectSym);
 	TEST_MSG("Got: %d; Expected: %d (%s)", ctx->sym, expectSym, expectSymName);
 	TEST_CHECK(strcmp(ctx->dataStr, expectDataStr) == 0);
@@ -847,115 +856,115 @@ void test_scandata_processScanData(void) {
 	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
 	assert(ctx);											// Satisfy analyzer
 
-#define test_testProcessScanData(ss, sd, s, d) do {							\
-	do_test_testProcessScanData(ctx, __FILE__, __LINE__, ss, sd, #s, gs1_encoder_s##s, d);		\
+#define test_testProcessScanData(err, sd, s, d) do {								\
+	do_test_testProcessScanData(ctx, __FILE__, __LINE__, gs1_encoder_e##err, sd, #s, gs1_encoder_s##s, d);	\
 } while (0)
 
-	test_testProcessScanData(false, "", NONE, "");			// No data
-	test_testProcessScanData(false, "ABC", NONE, "");		// No symbology identifier
-	test_testProcessScanData(false, "]", NONE, "");			// Short
-	test_testProcessScanData(false, "]X", NONE, "");		// Short
-	test_testProcessScanData(false, "]XX", NONE, "");		// Unknown symbology identifier
+	test_testProcessScanData(MISSING_SYMBOLOGY_IDENTIFIER, "", NONE, "");		// No data
+	test_testProcessScanData(MISSING_SYMBOLOGY_IDENTIFIER, "ABC", NONE, "");	// No symbology identifier
+	test_testProcessScanData(MISSING_SYMBOLOGY_IDENTIFIER, "]", NONE, "");		// Short
+	test_testProcessScanData(MISSING_SYMBOLOGY_IDENTIFIER, "]X", NONE, "");		// Short
+	test_testProcessScanData(UNSUPPORTED_SYMBOLOGY_IDENTIFIER, "]XX", NONE, "");	// Unknown symbology identifier
 
-	test_testProcessScanData(false, "]e0", NONE, "");		// Empty GS1 data
+	test_testProcessScanData(AI_DATA_EMPTY, "]e0", NONE, "");	// Empty GS1 data
 
 	/* QR */
-	test_testProcessScanData(true, "]Q1", QR, "");
-	test_testProcessScanData(true, "]Q1TESTING", QR, "TESTING");
-	test_testProcessScanData(true, "]Q1^TESTING", QR, "\\^TESTING");
-	test_testProcessScanData(true, "]Q1\\^TESTING", QR, "\\\\^TESTING");
-	test_testProcessScanData(false, "]Q3", NONE, "");		// Empty GS1 data
-	test_testProcessScanData(true, "]Q3011231231231233310ABC123" "\x1D" "99TESTING",
+	test_testProcessScanData(OK, "]Q1", QR, "");
+	test_testProcessScanData(OK, "]Q1TESTING", QR, "TESTING");
+	test_testProcessScanData(OK, "]Q1^TESTING", QR, "\\^TESTING");
+	test_testProcessScanData(OK, "]Q1\\^TESTING", QR, "\\\\^TESTING");
+	test_testProcessScanData(AI_DATA_EMPTY, "]Q3", NONE, "");	// Empty GS1 data
+	test_testProcessScanData(OK, "]Q3011231231231233310ABC123" "\x1D" "99TESTING",
 		QR, "^011231231231233310ABC123^99TESTING");
 
 	/* QR Code with GS1 Digital Link URI */
 	*ctx->dlAIbuffer = '\0';
-	test_testProcessScanData(true, "]Q1https://example.com/01/12312312312333?99=TEST",
+	test_testProcessScanData(OK, "]Q1https://example.com/01/12312312312333?99=TEST",
 		QR, "https://example.com/01/12312312312333?99=TEST");
 	TEST_CHECK(strcmp(ctx->dlAIbuffer, "^011231231231233399TEST") == 0);	// Check AI extraction
 
 	/* QR Code with GS1 Digital Link URI (uppercase scheme) */
 	*ctx->dlAIbuffer = '\0';
-	test_testProcessScanData(true, "]Q1HTTPS://example.com/01/12312312312333?99=TEST",
+	test_testProcessScanData(OK, "]Q1HTTPS://example.com/01/12312312312333?99=TEST",
 		QR, "HTTPS://example.com/01/12312312312333?99=TEST");
 	TEST_CHECK(strcmp(ctx->dlAIbuffer, "^011231231231233399TEST") == 0);	// Check AI extraction
 
 	/* QR Code with GS1 Digital Link URI (forbidden mixed-case scheme) */
 	*ctx->dlAIbuffer = '\0';
-	test_testProcessScanData(true, "]Q1HtTps://example.com/01/12312312312333?99=TEST",
+	test_testProcessScanData(OK, "]Q1HtTps://example.com/01/12312312312333?99=TEST",
 		QR, "HtTps://example.com/01/12312312312333?99=TEST");
 	TEST_CHECK(strcmp(ctx->dlAIbuffer, "") == 0);	// Check AI extraction
 
 	/* DM */
-	test_testProcessScanData(true, "]d1", DM, "");
-	test_testProcessScanData(true, "]d1TESTING", DM, "TESTING");
-	test_testProcessScanData(true, "]d1^TESTING", DM, "\\^TESTING");
-	test_testProcessScanData(true, "]d1\\^TESTING", DM, "\\\\^TESTING");
-	test_testProcessScanData(false, "]d2", NONE, "");		// Empty GS1 data
-	test_testProcessScanData(true, "]d2011231231231233310ABC123" "\x1D" "99TESTING",
+	test_testProcessScanData(OK, "]d1", DM, "");
+	test_testProcessScanData(OK, "]d1TESTING", DM, "TESTING");
+	test_testProcessScanData(OK, "]d1^TESTING", DM, "\\^TESTING");
+	test_testProcessScanData(OK, "]d1\\^TESTING", DM, "\\\\^TESTING");
+	test_testProcessScanData(AI_DATA_EMPTY, "]d2", NONE, "");	// Empty GS1 data
+	test_testProcessScanData(OK, "]d2011231231231233310ABC123" "\x1D" "99TESTING",
 		DM, "^011231231231233310ABC123^99TESTING");
 
 	/* DM with GS1 Digital Link URI */
 	*ctx->dlAIbuffer = '\0';
-	test_testProcessScanData(true, "]d1https://example.com/01/12312312312333?99=TEST",
+	test_testProcessScanData(OK, "]d1https://example.com/01/12312312312333?99=TEST",
 		DM, "https://example.com/01/12312312312333?99=TEST");
 	TEST_CHECK(strcmp(ctx->dlAIbuffer, "^011231231231233399TEST") == 0);	// Check AI extraction
 
 	/* DotCode */
-	test_testProcessScanData(true, "]J0", DotCode, "");
-	test_testProcessScanData(true, "]J0TESTING", DotCode, "TESTING");
-	test_testProcessScanData(true, "]J0^TESTING", DotCode, "\\^TESTING");
-	test_testProcessScanData(true, "]J0\\^TESTING", DotCode, "\\\\^TESTING");
-	test_testProcessScanData(false, "]J1", NONE, "");		// Empty GS1 data
-	test_testProcessScanData(true, "]J1011231231231233310ABC123" "\x1D" "99TESTING",
+	test_testProcessScanData(OK, "]J0", DotCode, "");
+	test_testProcessScanData(OK, "]J0TESTING", DotCode, "TESTING");
+	test_testProcessScanData(OK, "]J0^TESTING", DotCode, "\\^TESTING");
+	test_testProcessScanData(OK, "]J0\\^TESTING", DotCode, "\\\\^TESTING");
+	test_testProcessScanData(AI_DATA_EMPTY, "]J1", NONE, "");	// Empty GS1 data
+	test_testProcessScanData(OK, "]J1011231231231233310ABC123" "\x1D" "99TESTING",
 		DotCode, "^011231231231233310ABC123^99TESTING");
 
 	/* DotCode with GS1 Digital Link URI - carrier is suitable, but no active applications support this */
 	*ctx->dlAIbuffer = '\0';
-	test_testProcessScanData(true, "]J0https://example.com/01/12312312312333?99=TEST",
+	test_testProcessScanData(OK, "]J0https://example.com/01/12312312312333?99=TEST",
 		DotCode, "https://example.com/01/12312312312333?99=TEST");
 	TEST_CHECK(strcmp(ctx->dlAIbuffer, "^011231231231233399TEST") == 0);	// Check AI extraction
 
 	/* DataBar Expanded, shared with all DataBar family and UCC-128 Composite */
-	test_testProcessScanData(false, "]e0", NONE, "");		// Empty GS1 data
-	test_testProcessScanData(true, "]e0011231231231233310ABC123" "\x1D" "99TESTING",
+	test_testProcessScanData(AI_DATA_EMPTY, "]e0", NONE, "");	// Empty GS1 data
+	test_testProcessScanData(OK, "]e0011231231231233310ABC123" "\x1D" "99TESTING",
 		DataBarExpanded, "^011231231231233310ABC123^99TESTING");
-	test_testProcessScanData(true, "]e0011231231231233310ABC123" "\x1D" "99TESTING" "\x1D" "98XYZ",
+	test_testProcessScanData(OK, "]e0011231231231233310ABC123" "\x1D" "99TESTING" "\x1D" "98XYZ",
 		DataBarExpanded, "^011231231231233310ABC123^99TESTING^98XYZ");
-	test_testProcessScanData(true, "]e0011231231231233310ABC123" "\x1D" "1199122598TESTING" "\x1D" "97XYZ",
+	test_testProcessScanData(OK, "]e0011231231231233310ABC123" "\x1D" "1199122598TESTING" "\x1D" "97XYZ",
 		DataBarExpanded, "^011231231231233310ABC123^1199122598TESTING^97XYZ");
-	test_testProcessScanData(true, "]e00112312312312333235XYZ" "\x1D" "10ABC",
+	test_testProcessScanData(OK, "]e00112312312312333235XYZ" "\x1D" "10ABC",
 		DataBarExpanded, "^0112312312312333235XYZ^10ABC");	// (235) X..28 in DataBar composite
 
 	/* GS1-128 linear-only; composite is ]e0 */
-	test_testProcessScanData(false, "]C1", NONE, "");		// Empty GS1 data
-	test_testProcessScanData(true, "]C1011231231231233310ABC123" "\x1D" "99TESTING",
+	test_testProcessScanData(AI_DATA_EMPTY, "]C1", NONE, "");	// Empty GS1 data
+	test_testProcessScanData(OK, "]C1011231231231233310ABC123" "\x1D" "99TESTING",
 		GS1_128_CCA, "^011231231231233310ABC123^99TESTING");
-	test_testProcessScanData(true, "]C10112312312312333235XYZ",
+	test_testProcessScanData(OK, "]C10112312312312333235XYZ",
 		GS1_128_CCA, "^0112312312312333235XYZ");			// (235) X..28, no separator after last AI
-	test_testProcessScanData(true, "]C10112312312312333235XYZ" "\x1D" "10ABC",
+	test_testProcessScanData(OK, "]C10112312312312333235XYZ" "\x1D" "10ABC",
 		GS1_128_CCA, "^0112312312312333235XYZ^10ABC");		// (235) DO_FNC1 -> GS before (10)
 
 	/* EAN/UPC, except EAN-8 */
-	test_testProcessScanData(false, "]E0", NONE, "");
-	test_testProcessScanData(false, "]E0123456789012", NONE, "");	// Short
-	test_testProcessScanData(false, "]E012345678901234", NONE, "");	// Long
-	test_testProcessScanData(false, "]E01234ABC890123", NONE, "");	// Non-numeric
-	test_testProcessScanData(false, "]E02112345678901", NONE, "");	// Bad check digit
-	test_testProcessScanData(true, "]E02112345678900",
+	test_testProcessScanData(PRIMARY_SCAN_DATA_IS_TOO_SHORT, "]E0", NONE, "");
+	test_testProcessScanData(PRIMARY_SCAN_DATA_IS_TOO_SHORT, "]E0123456789012", NONE, "");			// Short
+	test_testProcessScanData(PRIMARY_MESSAGE_IS_TOO_LONG, "]E012345678901234", NONE, "");			// Long
+	test_testProcessScanData(PRIMARY_MESSAGE_MAY_ONLY_CONTAIN_DIGITS, "]E01234ABC890123", NONE, "");	// Non-numeric
+	test_testProcessScanData(PRIMARY_MESSAGE_CHECK_DIGIT_IS_INCORRECT, "]E02112345678901", NONE, "");	// Bad check digit
+	test_testProcessScanData(OK, "]E02112345678900",
 		EAN13, "2112345678900");
-	test_testProcessScanData(true, "]E02112345678900|]e099COMPOSITE" "\x1D" "98XYZ",
+	test_testProcessScanData(OK, "]E02112345678900|]e099COMPOSITE" "\x1D" "98XYZ",
 		EAN13, "2112345678900|^99COMPOSITE^98XYZ");
 
 	/* EAN-8 */
-	test_testProcessScanData(false, "]E4", NONE, "");
-	test_testProcessScanData(false, "]E41234567", NONE, "");	// Short
-	test_testProcessScanData(false, "]E4123456789", NONE, "");	// Long
-	test_testProcessScanData(false, "]E412ABC678", NONE, "");	// Non-numeric
-	test_testProcessScanData(false, "]E402345674", NONE, "");	// Bad check digit
-	test_testProcessScanData(true, "]E402345673",
+	test_testProcessScanData(PRIMARY_SCAN_DATA_IS_TOO_SHORT, "]E4", NONE, "");
+	test_testProcessScanData(PRIMARY_SCAN_DATA_IS_TOO_SHORT, "]E41234567", NONE, "");		// Short
+	test_testProcessScanData(PRIMARY_MESSAGE_IS_TOO_LONG, "]E4123456789", NONE, "");		// Long
+	test_testProcessScanData(PRIMARY_MESSAGE_MAY_ONLY_CONTAIN_DIGITS, "]E412ABC678", NONE, "");	// Non-numeric
+	test_testProcessScanData(PRIMARY_MESSAGE_CHECK_DIGIT_IS_INCORRECT, "]E402345674", NONE, "");	// Bad check digit
+	test_testProcessScanData(OK, "]E402345673",
 		EAN8, "02345673");
-	test_testProcessScanData(true, "]E402345673|]e099COMPOSITE" "\x1D" "98XYZ",
+	test_testProcessScanData(OK, "]E402345673|]e099COMPOSITE" "\x1D" "98XYZ",
 		EAN8, "02345673|^99COMPOSITE^98XYZ");
 
 	/*
@@ -982,13 +991,14 @@ void test_scandata_processScanData(void) {
 		scanbuf[3 + MAX_DATA - 1] = 'a';
 		scanbuf[3 + MAX_DATA] = '\0';
 		TEST_CHECK(!gs1_encoder_setScanData(ctx, scanbuf));
+		TEST_CHECK(ctx->err == gs1_encoder_eDATA_TOO_LONG);
 	}
 
 	/* Scan data with illegal carat in GS1-128 AI data */
-	test_testProcessScanData(false, "]C101123123123133^10ABC", NONE, "");
+	test_testProcessScanData(SCAN_DATA_CONTAINS_ILLEGAL_CARAT, "]C101123123123133^10ABC", NONE, "");
 
 	/* Plain scan data with invalid DL URI (no primary AI) */
-	test_testProcessScanData(false, "]Q1https://a/NOPRIMARYAI", NONE, "");
+	test_testProcessScanData(NO_GS1_DL_KEYS_FOUND_IN_PATH_INFO, "]Q1https://a/NOPRIMARYAI", NONE, "");
 
 #undef test_testProcessScanData
 

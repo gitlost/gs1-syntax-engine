@@ -46,4 +46,8 @@ static inline gs1_encoder *gs1_encoder_unit_test_init(void) {
 }
 
 
+/* Expected-error alias: test call sites write OK for success */
+#define gs1_encoder_eOK gs1_encoder_eNO_ERROR
+
+
 #endif
