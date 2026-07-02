@@ -128,5 +128,6 @@
 #define TR_EN_DOMAIN_CONTAINS_ILLEGAL_CHARACTERS "Domain contains illegal characters"
 #define TR_EN_AI_VALUE_LENGTH_EXCEEDS_IMPL "AI value length exceeds implementation limit of %d characters"
 #define TR_EN_AI_TITLE_TOO_LONG "AI title exceeds implementation limit of %d characters"
+#define TR_EN_NO_SYMBOLOGY_SELECTED "No symbology selected"
 
 #endif  /* TR_EN_H */

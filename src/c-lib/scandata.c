@@ -267,8 +267,10 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 
 		if (!cc) {
 			// "]C1" for linear-only GS1-128
-			if (*ctx->dataStr != '^')
+			if (*ctx->dataStr != '^') {
+				SET_ERR(MISSING_FNC1_IN_FIRST_POSITION);
 				goto fail;
+			}
 			ctx->outStr[outStr_len++] = ']';
 			memcpy(ctx->outStr + outStr_len, lookupSymId(ctx), 2);
 			outStr_len += 2;
@@ -282,8 +284,10 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 	case gs1_encoder_sDataBarExpanded:  // And GS1-128 Composite
 
 		// "]e0" followed by concatenated AI data from linear and CC
-		if (*ctx->dataStr != '^')
+		if (*ctx->dataStr != '^') {
+			SET_ERR(MISSING_FNC1_IN_FIRST_POSITION);
 			goto fail;
+		}
 		memcpy(ctx->outStr + outStr_len, CC_SYM_ID, sizeof(CC_SYM_ID) - 1);
 		outStr_len += sizeof(CC_SYM_ID) - 1;
 		ctx->outStr[outStr_len] = '\0';
@@ -294,8 +298,10 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 			bool lastAIfnc1 = false;
 			int i;
 
-			if (*cc != '^')
+			if (*cc != '^') {
+				SET_ERR(MISSING_FNC1_IN_FIRST_POSITION);
 				goto fail;
+			}
 
 			// Append GS if last AI of linear component isn't fixed-length
 			for (i = 0; i < ctx->numAIs && ctx->aiData[i].aiEntry; i++)
@@ -344,8 +350,10 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 		}
 
 		if (cc) {
-			if (*cc != '^')
+			if (*cc != '^') {
+				SET_ERR(MISSING_FNC1_IN_FIRST_POSITION);
 				goto fail;
+			}
 			scancat(ctx->outStr, cc, outStr_len);
 		}
 
@@ -389,8 +397,10 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 			goto fail;
 
 		if (cc) {
-			if (*cc != '^')
+			if (*cc != '^') {
+				SET_ERR(MISSING_FNC1_IN_FIRST_POSITION);
 				goto fail;
+			}
 			ctx->outStr[outStr_len++] = '|';
 			memcpy(ctx->outStr + outStr_len, CC_SYM_ID, sizeof(CC_SYM_ID) - 1);
 			outStr_len += sizeof(CC_SYM_ID) - 1;
@@ -401,6 +411,7 @@ char* gs1_generateScanData(gs1_encoder* const ctx) {
 
 	case gs1_encoder_sNONE:
 	case gs1_encoder_sNUMSYMS:
+		SET_ERR(NO_SYMBOLOGY_SELECTED);
 		goto fail;
 
 	}

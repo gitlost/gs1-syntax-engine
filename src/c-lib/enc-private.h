@@ -249,6 +249,7 @@ typedef enum {
 	gs1_encoder_eDOMAIN_CONTAINS_ILLEGAL_CHARACTERS,
 	gs1_encoder_eAI_VALUE_LENGTH_EXCEEDS_IMPL,
 	gs1_encoder_eAI_TITLE_TOO_LONG,
+	gs1_encoder_eNO_SYMBOLOGY_SELECTED,
 	__GS1_ENCODERS_NUM_ERRS
 } gs1_encoder_err_t;
 
