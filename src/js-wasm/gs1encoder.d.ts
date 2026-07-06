@@ -266,7 +266,7 @@ export class GS1encoder {
      * @type {string}
      * @throws {@link GS1encoderParameterException}
      */
-    get aiDataStr(): string;
+    get aiDataStr(): string | null;
     set dataStr(value: string);
     /**
      * Get/set the raw data that would be directly encoded within a GS1 barcode message.

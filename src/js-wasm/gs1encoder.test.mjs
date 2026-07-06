@@ -291,3 +291,54 @@ test('noEmbedded refuses embedded fallback', async () => {
   await expect(gs1encoder.init({ noEmbedded: true }))
     .rejects.toThrow(GS1encoderGeneralException);
 });
+
+test('use after free throws', async () => {
+  const enc = await GS1encoder.create();
+  enc.free();
+  enc.free();  // idempotent
+
+  expect(enc.version).toBeTruthy();  // context-free, still works
+
+  expect(() => enc.sym).toThrow(GS1encoderGeneralException);
+  expect(() => { enc.sym = GS1encoder.symbology.QR; }).toThrow(GS1encoderGeneralException);
+  expect(() => enc.addCheckDigit).toThrow(GS1encoderGeneralException);
+  expect(() => { enc.addCheckDigit = true; }).toThrow(GS1encoderGeneralException);
+  expect(() => enc.dataStr).toThrow(GS1encoderGeneralException);
+  expect(() => { enc.dataStr = "^0112312312312333"; }).toThrow(GS1encoderGeneralException);
+  expect(() => enc.aiDataStr).toThrow(GS1encoderGeneralException);
+  expect(() => { enc.aiDataStr = "(01)12312312312319"; }).toThrow(GS1encoderGeneralException);
+  expect(() => enc.scanData).toThrow(GS1encoderGeneralException);
+  expect(() => { enc.scanData = "]Q1x"; }).toThrow(GS1encoderGeneralException);
+  expect(() => enc.getDLuri(null)).toThrow(GS1encoderGeneralException);
+  expect(() => enc.hri).toThrow(GS1encoderGeneralException);
+  expect(() => enc.dlIgnoredQueryParams).toThrow(GS1encoderGeneralException);
+  expect(() => enc.errMarkup).toThrow(GS1encoderGeneralException);
+});
+
+test('free after failed init is safe', async () => {
+  const enc = new GS1encoder();
+  await expect(enc.init({ syntaxDictionary: "nonexistent-file.txt" }))
+    .rejects.toThrow(GS1encoderGeneralException);
+  expect(() => enc.free()).not.toThrow();
+});
+
+test('re-init of a live instance throws', async () => {
+  const enc = await GS1encoder.create();
+  await expect(enc.init()).rejects.toThrow(GS1encoderGeneralException);
+  enc.free();
+});
+
+test('non-string data setter arguments throw', async () => {
+  const enc = await GS1encoder.create();
+  for (const bad of [null, undefined, 123, true, {}]) {
+    expect(() => { enc.dataStr = bad; }).toThrow(TypeError);
+    expect(() => { enc.aiDataStr = bad; }).toThrow(TypeError);
+    expect(() => { enc.scanData = bad; }).toThrow(TypeError);
+  }
+  expect(() => enc.getDLuri(123)).toThrow(TypeError);
+  // null/undefined stem remains legal (canonical stem)
+  enc.aiDataStr = "(01)12312312312319";
+  expect(enc.getDLuri(null)).toMatch(/^https:\/\/id\.gs1\.org\//);
+  expect(enc.getDLuri()).toMatch(/^https:\/\/id\.gs1\.org\//);
+  enc.free();
+});
