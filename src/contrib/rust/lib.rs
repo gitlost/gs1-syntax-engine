@@ -119,9 +119,9 @@ extern "C" {
     fn gs1_encoder_getDLuri(ctx: *mut gs1_encoder, stem: *const c_char) -> *const c_char;
     fn gs1_encoder_getDLignoredQueryParams(
         ctx: *mut gs1_encoder,
-        qp: *const *const *const c_char,
+        qp: *mut *mut *mut c_char,
     ) -> c_int;
-    fn gs1_encoder_getHRI(ctx: *mut gs1_encoder, hri: *const *const *const c_char) -> c_int;
+    fn gs1_encoder_getHRI(ctx: *mut gs1_encoder, hri: *mut *mut *mut c_char) -> c_int;
 }
 
 pub struct GS1Encoder {
@@ -147,12 +147,23 @@ impl GS1Encoder {
         Ok(gs1encoder)
     }
 
-    pub fn free(&mut self) {
+    fn release(&mut self) {
         if !self.ctx.is_null() {
             unsafe { gs1_encoder_free(self.ctx) };
             self.ctx = ptr::null_mut();
         }
     }
+
+    /// Consumes the encoder, releasing the native context.
+    ///
+    /// Taking `self` by value makes use-after-free unrepresentable:
+    ///
+    /// ```compile_fail
+    /// let enc = gs1encoders::GS1Encoder::new().unwrap();
+    /// enc.free();
+    /// enc.get_version();
+    /// ```
+    pub fn free(self) {}
 
     pub fn get_version(&self) -> String {
         let c_str: &CStr = unsafe { CStr::from_ptr(gs1_encoder_getVersion()) };
@@ -261,7 +272,9 @@ impl GS1Encoder {
     }
 
     pub fn set_data_str(&mut self, value: &str) -> Result<(), GS1EncoderError> {
-        let c_str = CString::new(value).unwrap();
+        let c_str = CString::new(value).map_err(|_| {
+            GS1EncoderError::GS1ParameterError("Input must not contain a NUL character".to_string())
+        })?;
         let ret = unsafe { gs1_encoder_setDataStr(self.ctx, c_str.as_ptr() as *const c_char) };
         if !ret {
             return Err(GS1EncoderError::GS1ParameterError(self.get_err_msg()));
@@ -279,7 +292,9 @@ impl GS1Encoder {
     }
 
     pub fn set_ai_data_str(&mut self, value: &str) -> Result<(), GS1EncoderError> {
-        let c_str = CString::new(value).unwrap();
+        let c_str = CString::new(value).map_err(|_| {
+            GS1EncoderError::GS1ParameterError("Input must not contain a NUL character".to_string())
+        })?;
         let ret = unsafe { gs1_encoder_setAIdataStr(self.ctx, c_str.as_ptr() as *const c_char) };
         if !ret {
             return Err(GS1EncoderError::GS1ParameterError(self.get_err_msg()));
@@ -297,7 +312,9 @@ impl GS1Encoder {
     }
 
     pub fn set_scan_data(&mut self, value: &str) -> Result<(), GS1EncoderError> {
-        let c_str = CString::new(value).unwrap();
+        let c_str = CString::new(value).map_err(|_| {
+            GS1EncoderError::GS1ScanDataError("Input must not contain a NUL character".to_string())
+        })?;
         let ret = unsafe { gs1_encoder_setScanData(self.ctx, c_str.as_ptr() as *const c_char) };
         if !ret {
             return Err(GS1EncoderError::GS1ScanDataError(self.get_err_msg()));
@@ -306,7 +323,15 @@ impl GS1Encoder {
     }
 
     pub fn get_dl_uri(&self, stem: Option<&str>) -> Result<String, GS1EncoderError> {
-        let c_stem = stem.map(|s| CString::new(s).unwrap());
+        let c_stem = stem
+            .map(|s| {
+                CString::new(s).map_err(|_| {
+                    GS1EncoderError::GS1DigitalLinkError(
+                        "Stem must not contain a NUL character".to_string(),
+                    )
+                })
+            })
+            .transpose()?;
         let stem_ptr = c_stem
             .as_ref()
             .map_or(ptr::null(), |s| s.as_ptr() as *const c_char);
@@ -319,24 +344,22 @@ impl GS1Encoder {
     }
 
     pub fn get_dl_ignored_query_params(&self) -> Vec<String> {
-        let ptr: *const *const c_char = ptr::null();
-        let size = unsafe { gs1_encoder_getDLignoredQueryParams(self.ctx, &ptr) };
+        let mut lines: *mut *mut c_char = ptr::null_mut();
+        let size = unsafe { gs1_encoder_getDLignoredQueryParams(self.ctx, &mut lines) };
         let mut params = Vec::with_capacity(size as usize);
         for i in 0..size {
-            let c_buf = unsafe { ptr::read(ptr.offset(i as isize)) };
-            let c_str: &CStr = unsafe { CStr::from_ptr(c_buf) };
+            let c_str: &CStr = unsafe { CStr::from_ptr(*lines.offset(i as isize)) };
             params.push(c_str.to_str().unwrap().to_owned());
         }
         params
     }
 
     pub fn get_hri(&self) -> Vec<String> {
-        let ptr: *const *const c_char = ptr::null();
-        let size = unsafe { gs1_encoder_getHRI(self.ctx, &ptr) };
+        let mut lines: *mut *mut c_char = ptr::null_mut();
+        let size = unsafe { gs1_encoder_getHRI(self.ctx, &mut lines) };
         let mut hri = Vec::with_capacity(size as usize);
         for i in 0..size {
-            let c_buf = unsafe { ptr::read(ptr.offset(i as isize)) };
-            let c_str: &CStr = unsafe { CStr::from_ptr(c_buf) };
+            let c_str: &CStr = unsafe { CStr::from_ptr(*lines.offset(i as isize)) };
             hri.push(c_str.to_str().unwrap().to_owned());
         }
         hri
@@ -345,7 +368,7 @@ impl GS1Encoder {
 
 impl Drop for GS1Encoder {
     fn drop(&mut self) {
-        self.free();
+        self.release();
     }
 }
 
@@ -657,5 +680,34 @@ mod tests {
         let gs1encoder = GS1Encoder::new().unwrap();
         assert!(!gs1encoder.get_version().is_empty());
         drop(gs1encoder); // Should trigger Drop and free native resources
+    }
+
+    #[test]
+    fn test_free_consumes() {
+        let gs1encoder = GS1Encoder::new().unwrap();
+        gs1encoder.free(); // Moves the encoder; use afterwards is a compile error
+    }
+
+    #[test]
+    fn test_interior_nul_is_error() {
+        let mut gs1encoder = GS1Encoder::new().unwrap();
+
+        assert!(matches!(
+            gs1encoder.set_data_str("bad\0data"),
+            Err(GS1EncoderError::GS1ParameterError(_))
+        ));
+        assert!(matches!(
+            gs1encoder.set_ai_data_str("bad\0data"),
+            Err(GS1EncoderError::GS1ParameterError(_))
+        ));
+        assert!(matches!(
+            gs1encoder.set_scan_data("bad\0data"),
+            Err(GS1EncoderError::GS1ScanDataError(_))
+        ));
+        gs1encoder.set_ai_data_str("(01)12312312312319").unwrap();
+        assert!(matches!(
+            gs1encoder.get_dl_uri(Some("https://bad\0stem")),
+            Err(GS1EncoderError::GS1DigitalLinkError(_))
+        ));
     }
 }
