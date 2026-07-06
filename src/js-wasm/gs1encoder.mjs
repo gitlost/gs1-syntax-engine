@@ -561,7 +561,7 @@ export class GS1encoder {
      * <p>
      * <pre>(01)12345678901231|(10)ABC123(11)210630</pre>
      *
-     * @type {string}
+     * @type {string|null}
      * @throws {@link GS1encoderParameterException}
      */
     get aiDataStr() {
@@ -570,6 +570,9 @@ export class GS1encoder {
             return null;
         return this.module.UTF8ToString(c_str);
     }
+    /**
+     * @param {string} value
+     */
     set aiDataStr(value) {
         if (typeof value !== "string")
             throw new TypeError("value must be a string");

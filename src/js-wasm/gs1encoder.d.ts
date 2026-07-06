@@ -78,9 +78,19 @@ export class GS1encoder {
     private _stageSyntaxDictionary;
     /**
      * Frees the resources associated with this encoder instance.
+     * <p>
+     * Freeing is idempotent; any other use of a freed instance throws
+     * {@link GS1encoderGeneralException}.
+     *
      * @returns {void}
      */
     free(): void;
+    /**
+     * A freed or uninitialised context must not reach the native library,
+     * whose entry points require a valid instance.
+     * @private
+     */
+    private _checkedCtx;
     /**
      * Get the version string of the library.
      * <p>
@@ -235,6 +245,9 @@ export class GS1encoder {
      * @throws {@link GS1encoderParameterException}
      */
     get validateAIassociations(): boolean;
+    /**
+     * @param {string} value
+     */
     set aiDataStr(value: string);
     /**
      * Get/set the barcode data input buffer using GS1 Application Identifier syntax.
@@ -263,7 +276,7 @@ export class GS1encoder {
      * <p>
      * <pre>(01)12345678901231|(10)ABC123(11)210630</pre>
      *
-     * @type {string}
+     * @type {string|null}
      * @throws {@link GS1encoderParameterException}
      */
     get aiDataStr(): string | null;
