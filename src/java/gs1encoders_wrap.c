@@ -197,14 +197,14 @@ JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetData
         jlong ctx,
         jstring value) {
     const char* str;
-    jboolean isCopy;
     jboolean ret;
 
-    str = (*env)->GetStringUTFChars(env, value, &isCopy);
-    ret = gs1_encoder_setDataStr((gs1_encoder*)ctx, str);
+    str = (*env)->GetStringUTFChars(env, value, NULL);
+    if (str == NULL)
+        return JNI_FALSE;    /* OutOfMemoryError pending */
 
-    if (isCopy == JNI_TRUE)
-        (*env)->ReleaseStringUTFChars(env, value, str);
+    ret = gs1_encoder_setDataStr((gs1_encoder*)ctx, str);
+    (*env)->ReleaseStringUTFChars(env, value, str);
 
     return ret;
 }
@@ -223,14 +223,14 @@ JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetAIda
         jlong ctx,
         jstring value) {
     const char* str;
-    jboolean isCopy;
     jboolean ret;
 
-    str = (*env)->GetStringUTFChars(env, value, &isCopy);
-    ret = gs1_encoder_setAIdataStr((gs1_encoder*)ctx, str);
+    str = (*env)->GetStringUTFChars(env, value, NULL);
+    if (str == NULL)
+        return JNI_FALSE;    /* OutOfMemoryError pending */
 
-    if (isCopy == JNI_TRUE)
-        (*env)->ReleaseStringUTFChars(env, value, str);
+    ret = gs1_encoder_setAIdataStr((gs1_encoder*)ctx, str);
+    (*env)->ReleaseStringUTFChars(env, value, str);
 
     return ret;
 }
@@ -249,14 +249,14 @@ JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetScan
         jlong ctx,
         jstring value) {
     const char* str;
-    jboolean isCopy;
     jboolean ret;
 
-    str = (*env)->GetStringUTFChars(env, value, &isCopy);
-    ret = gs1_encoder_setScanData((gs1_encoder*)ctx, str);
+    str = (*env)->GetStringUTFChars(env, value, NULL);
+    if (str == NULL)
+        return JNI_FALSE;    /* OutOfMemoryError pending */
 
-    if (isCopy == JNI_TRUE)
-        (*env)->ReleaseStringUTFChars(env, value, str);
+    ret = gs1_encoder_setScanData((gs1_encoder*)ctx, str);
+    (*env)->ReleaseStringUTFChars(env, value, str);
 
     return ret;
 }
@@ -277,11 +277,13 @@ JNIEXPORT jstring JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetDLuri
 
     const char* out;
     const char* str;
-    jboolean isCopy = JNI_FALSE;
 
-    str = stem ? (*env)->GetStringUTFChars(env, stem, &isCopy) : NULL;
+    str = stem ? (*env)->GetStringUTFChars(env, stem, NULL) : NULL;
+    if (stem != NULL && str == NULL)
+        return NULL;    /* OutOfMemoryError pending */
+
     out = gs1_encoder_getDLuri((gs1_encoder*)ctx, (char*)str);
-    if (isCopy == JNI_TRUE)
+    if (str != NULL)
         (*env)->ReleaseStringUTFChars(env, stem, str);
 
     return out ? (*env)->NewStringUTF(env, out) : NULL;
