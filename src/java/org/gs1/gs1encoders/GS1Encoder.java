@@ -296,6 +296,14 @@ public class GS1Encoder implements AutoCloseable {
      */
     private long ctx;
 
+    // Guards every native call: a freed context must not reach the native
+    // library, whose entry points require a valid instance.
+    private long ctx() {
+        if (ctx == 0)
+            throw new IllegalStateException("GS1Encoder instance has been closed");
+        return ctx;
+    }
+
     /*
      *  Methods to provide a wrapper around the functional interface imported from the native library
      *
@@ -305,7 +313,7 @@ public class GS1Encoder implements AutoCloseable {
     // an error is returned by the native library. Therefore direct access to the native
     // error message is not necessary.
     private String getErrMsg() {
-        return gs1encoderGetErrMsgJNI(ctx);
+        return gs1encoderGetErrMsgJNI(ctx());
     }
 
 
@@ -368,6 +376,8 @@ public class GS1Encoder implements AutoCloseable {
      * Releases the resources associated with this encoder instance.
      * <p>
      * This method is called automatically when used with try-with-resources.
+     * Closing is idempotent; any other method called on a closed instance
+     * throws {@link IllegalStateException}.
      */
     @Override
     public void close() {
@@ -397,7 +407,7 @@ public class GS1Encoder implements AutoCloseable {
      * @see #setScanData(String)
      */
     public Symbology getSym() {
-        return Symbology.fromValue(gs1encoderGetSymJNI(ctx));
+        return Symbology.fromValue(gs1encoderGetSymJNI(ctx()));
     }
 
     /**
@@ -411,7 +421,7 @@ public class GS1Encoder implements AutoCloseable {
      * @see Symbology
      */
     public void setSym(Symbology value) throws GS1EncoderParameterException {
-        if (!gs1encoderSetSymJNI(ctx, value.getValue()))
+        if (!gs1encoderSetSymJNI(ctx(), value.getValue()))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -422,7 +432,7 @@ public class GS1Encoder implements AutoCloseable {
      * @see #setAddCheckDigit(boolean)
      */
     public boolean getAddCheckDigit() {
-        return gs1encoderGetAddCheckDigitJNI(ctx);
+        return gs1encoderGetAddCheckDigitJNI(ctx());
     }
 
     /**
@@ -440,7 +450,7 @@ public class GS1Encoder implements AutoCloseable {
      * @see #getAddCheckDigit()
      */
     public void setAddCheckDigit(boolean value) throws GS1EncoderParameterException {
-        if (!gs1encoderSetAddCheckDigitJNI(ctx, value))
+        if (!gs1encoderSetAddCheckDigitJNI(ctx(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -452,7 +462,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return the status of the "include data titles in HRI" flag
      */
     public boolean getIncludeDataTitlesInHRI() {
-        return gs1encoderGetIncludeDataTitlesInHRIJNI(ctx);
+        return gs1encoderGetIncludeDataTitlesInHRIJNI(ctx());
     }
 
     /**
@@ -467,7 +477,7 @@ public class GS1Encoder implements AutoCloseable {
      * @throws GS1EncoderParameterException if an error occurs
      */
     public void setIncludeDataTitlesInHRI(boolean value) throws GS1EncoderParameterException {
-        if (!gs1encoderSetIncludeDataTitlesInHRIJNI(ctx, value))
+        if (!gs1encoderSetIncludeDataTitlesInHRIJNI(ctx(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -479,7 +489,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return the status of the "permit unknown AIs" mode
      */
     public boolean getPermitUnknownAIs() {
-        return gs1encoderGetPermitUnknownAIsJNI(ctx);
+        return gs1encoderGetPermitUnknownAIsJNI(ctx());
     }
 
     /**
@@ -503,7 +513,7 @@ public class GS1Encoder implements AutoCloseable {
      * @throws GS1EncoderParameterException if an error occurs
      */
     public void setPermitUnknownAIs(boolean value) throws GS1EncoderParameterException {
-        if (!gs1encoderSetPermitUnknownAIsJNI(ctx, value))
+        if (!gs1encoderSetPermitUnknownAIsJNI(ctx(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -515,7 +525,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return the status of the "permit zero-suppressed GTINs in GS1 DL URIs" mode
      */
     public boolean getPermitZeroSuppressedGTINinDLuris() {
-        return gs1encoderGetPermitZeroSuppressedGTINinDLurisJNI(ctx);
+        return gs1encoderGetPermitZeroSuppressedGTINinDLurisJNI(ctx());
     }
 
     /**
@@ -538,7 +548,7 @@ public class GS1Encoder implements AutoCloseable {
      * @throws GS1EncoderParameterException if an error occurs
      */
     public void setPermitZeroSuppressedGTINinDLuris(boolean value) throws GS1EncoderParameterException {
-        if (!gs1encoderSetPermitZeroSuppressedGTINinDLurisJNI(ctx, value))
+        if (!gs1encoderSetPermitZeroSuppressedGTINinDLurisJNI(ctx(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -549,7 +559,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return {@code true} if the AI validation procedure is currently enabled; {@code false} otherwise
      */
     public boolean getValidationEnabled(Validation validation) {
-        return gs1encoderGetValidationEnabledJNI(ctx, validation.getValue());
+        return gs1encoderGetValidationEnabledJNI(ctx(), validation.getValue());
     }
 
     /**
@@ -568,7 +578,7 @@ public class GS1Encoder implements AutoCloseable {
      * @throws GS1EncoderParameterException if an error occurs
      */
     public void setValidationEnabled(Validation validation, boolean value) throws GS1EncoderParameterException {
-        if (!gs1encoderSetValidationEnabledJNI(ctx, validation.getValue(), value))
+        if (!gs1encoderSetValidationEnabledJNI(ctx(), validation.getValue(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -624,7 +634,7 @@ public class GS1Encoder implements AutoCloseable {
      * @see #setScanData(String)
      */
     public String getDataStr() {
-        return gs1encoderGetDataStrJNI(ctx);
+        return gs1encoderGetDataStrJNI(ctx());
     }
 
     /**
@@ -674,7 +684,7 @@ public class GS1Encoder implements AutoCloseable {
      */
     public void setDataStr(String value) throws GS1EncoderParameterException {
         Objects.requireNonNull(value, "value must not be null");
-        if (!gs1encoderSetDataStrJNI(ctx, value))
+        if (!gs1encoderSetDataStrJNI(ctx(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -687,7 +697,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return the barcode data in GS1 AI syntax, or {@code null} if not AI data
      */
     public String getAIdataStr() {
-        return gs1encoderGetAIdataStrJNI(ctx);
+        return gs1encoderGetAIdataStrJNI(ctx());
     }
 
     /**
@@ -720,7 +730,7 @@ public class GS1Encoder implements AutoCloseable {
      */
     public void setAIdataStr(String value) throws GS1EncoderParameterException {
         Objects.requireNonNull(value, "value must not be null");
-        if (!gs1encoderSetAIdataStrJNI(ctx, value))
+        if (!gs1encoderSetAIdataStrJNI(ctx(), value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
 
@@ -737,7 +747,7 @@ public class GS1Encoder implements AutoCloseable {
      *         data cannot be represented in the selected symbology
      */
     public String getScanData() throws GS1EncoderScanDataException {
-        String out = gs1encoderGetScanDataJNI(ctx);
+        String out = gs1encoderGetScanDataJNI(ctx());
         if (out == null)
             throw new GS1EncoderScanDataException(this.getErrMsg());
         return out;
@@ -774,7 +784,7 @@ public class GS1Encoder implements AutoCloseable {
      */
     public void setScanData(String value) throws GS1EncoderScanDataException {
         Objects.requireNonNull(value, "value must not be null");
-        if (!gs1encoderSetScanDataJNI(ctx, value))
+        if (!gs1encoderSetScanDataJNI(ctx(), value))
             throw new GS1EncoderScanDataException(this.getErrMsg());
     }
 
@@ -791,7 +801,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return marked up instance of the AI that failed validation, or empty string if no linting failure
      */
     public String getErrMarkup() {
-        return gs1encoderGetErrMarkupJNI(ctx);
+        return gs1encoderGetErrMarkupJNI(ctx());
     }
 
     /**
@@ -808,7 +818,7 @@ public class GS1Encoder implements AutoCloseable {
      * @throws GS1EncoderDigitalLinkException if invalid input was provided
      */
     public String getDLuri(String stem) throws GS1EncoderDigitalLinkException {
-        String uri = gs1encoderGetDLuriJNI(ctx, stem);
+        String uri = gs1encoderGetDLuriJNI(ctx(), stem);
         if (uri == null)
             throw new GS1EncoderDigitalLinkException(this.getErrMsg());
         return uri;
@@ -831,7 +841,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return an array of strings representing the HRI text
      */
     public String[] getHRI() {
-        return gs1encoderGetHRIJNI(ctx);
+        return gs1encoderGetHRIJNI(ctx());
     }
 
     /**
@@ -848,7 +858,7 @@ public class GS1Encoder implements AutoCloseable {
      * @return an array of strings containing the non-numeric query parameters that were ignored
      */
     public String[] getDLignoredQueryParams() {
-        return gs1encoderGetDLignoredQueryParamsJNI(ctx);
+        return gs1encoderGetDLignoredQueryParamsJNI(ctx());
     }
 
     /**
