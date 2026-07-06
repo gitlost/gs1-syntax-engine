@@ -61,6 +61,8 @@ JNIEXPORT jlong JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderInitExJNI(
     }
     if (syntaxDictionary) {
         path = (*env)->GetStringUTFChars(env, syntaxDictionary, NULL);
+        if (path == NULL)
+            return 0;    /* OutOfMemoryError pending */
         opts.syntaxDictionary = path;
     }
     ret = (jlong)gs1_encoder_init_ex(NULL, &opts);

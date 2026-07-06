@@ -173,6 +173,7 @@ int main(void) {
 	struct JNINativeInterface_ fns;
 	JNIEnv env = &fns;
 	jlong ctx;
+	struct fakeInitOptions opts = { J("../c-lib/gs1-syntax-dictionary.txt"), JNI_FALSE, JNI_FALSE };
 
 	setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -199,6 +200,7 @@ int main(void) {
 	CHECK(Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetAIdataStrJNI(&env, NULL, ctx, J("x")) == JNI_FALSE);
 	CHECK(Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetScanDataJNI(&env, NULL, ctx, J("x")) == JNI_FALSE);
 	CHECK(Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetDLuriJNI(&env, NULL, ctx, J("x")) == NULL);
+	CHECK(Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderInitExJNI(&env, NULL, (jobject)&opts, NULL) == 0);
 	Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderFreeJNI(&env, NULL, ctx);
 	printf("fail mode  : no crash, no release of failed acquisition\n");
 
