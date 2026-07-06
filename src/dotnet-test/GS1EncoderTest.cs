@@ -309,6 +309,42 @@ namespace GS1EncodersTest
             });
         }
 
+        [TestMethod]
+        public void TestNullDataSetterArguments()
+        {
+            using (GS1Encoder gs1encoder = new GS1Encoder())
+            {
+                Assert.ThrowsExactly<System.ArgumentNullException>(() => { gs1encoder.DataStr = null; });
+                Assert.ThrowsExactly<System.ArgumentNullException>(() => { gs1encoder.AIdataStr = null; });
+                Assert.ThrowsExactly<System.ArgumentNullException>(() => { gs1encoder.ScanData = null; });
+            }
+        }
+
+        [TestMethod]
+        public void TestUseAfterDispose()
+        {
+            GS1Encoder gs1encoder = new GS1Encoder();
+            gs1encoder.Dispose();
+            gs1encoder.Dispose();
+
+            Assert.IsFalse(string.IsNullOrEmpty(gs1encoder.Version));
+
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.Sym; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { gs1encoder.Sym = GS1Encoder.Symbology.QR; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.AddCheckDigit; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { gs1encoder.AddCheckDigit = true; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.DataStr; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { gs1encoder.DataStr = "^0112312312312333"; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.AIdataStr; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { gs1encoder.AIdataStr = "(01)12312312312319"; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.ScanData; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { gs1encoder.ScanData = "]Q1x"; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { gs1encoder.GetDLuri(null); });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.HRI; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.DLignoredQueryParams; });
+            Assert.ThrowsExactly<System.ObjectDisposedException>(() => { _ = gs1encoder.ErrMarkup; });
+        }
+
     }
 
 }
