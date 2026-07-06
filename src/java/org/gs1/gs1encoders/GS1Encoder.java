@@ -27,6 +27,10 @@ import java.util.Objects;
 
 /**
  * Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.
+ * <p>
+ * The library is thread-safe provided that each thread operates on its own
+ * GS1Encoder instance. This applies also to the getters, which mutate
+ * internal buffers of the native context.
  */
 public class GS1Encoder implements AutoCloseable {
 

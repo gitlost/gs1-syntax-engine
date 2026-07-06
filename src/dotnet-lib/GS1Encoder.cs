@@ -25,6 +25,11 @@ namespace GS1.Encoders
     /// <summary>
     /// Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.
     /// </summary>
+    /// <remarks>
+    /// The library is thread-safe provided that each thread operates on its
+    /// own GS1Encoder instance. This applies also to the property getters,
+    /// which mutate internal buffers of the native context.
+    /// </remarks>
     public class GS1Encoder : IDisposable
     {
 

@@ -258,6 +258,10 @@ private:
 /// ownership can be transferred. The destructor releases the native
 /// resources, so the object can be used at any scope without manual
 /// cleanup.
+///
+/// The library is thread-safe provided that each thread operates on its
+/// own GS1Encoder instance. This applies also to the const accessors,
+/// which mutate internal buffers of the native context.
 class GS1Encoder {
 public:
 

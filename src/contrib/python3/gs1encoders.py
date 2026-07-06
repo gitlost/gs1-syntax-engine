@@ -70,7 +70,13 @@ class Validation(enum.IntEnum):
 
 
 class GS1Encoder:
-    """Wrapper around the GS1 Barcode Syntax Engine native C library."""
+    """Wrapper around the GS1 Barcode Syntax Engine native C library.
+
+    The library is thread-safe provided that each thread operates on its
+    own GS1Encoder instance. Note that ctypes releases the GIL during
+    native calls, so the GIL does not serialise access to a shared
+    instance.
+    """
 
     __ctx = None
     __api: ctypes.CDLL = ctypes.cdll.LoadLibrary("libgs1encoders.so")
