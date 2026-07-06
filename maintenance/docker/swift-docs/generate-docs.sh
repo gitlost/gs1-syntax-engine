@@ -23,5 +23,11 @@ jazzy \
     --skip-undocumented \
     --hide-documentation-coverage
 
+# Jazzy exits successfully even when symbol extraction finds nothing
+if ! grep -q '":' "$OUTPUT_DIR/search.json"; then
+    echo "error: no API symbols were documented" >&2
+    exit 1
+fi
+
 # Remove docsets directory containing binary assets
 rm -rf "$OUTPUT_DIR/docsets"
