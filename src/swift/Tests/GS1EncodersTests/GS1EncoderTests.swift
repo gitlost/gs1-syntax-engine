@@ -38,7 +38,7 @@ final class GS1EncoderTests: XCTestCase {
 
         try gs1encoder.setSym(.DM)
         XCTAssertEqual(gs1encoder.getSym(), .DM)
-        XCTAssertEqual(gs1encoder.getScanData(), "]d1https://id.example.org/test/01/12312312312319?99=TESTING123")
+        XCTAssertEqual(try gs1encoder.getScanData(), "]d1https://id.example.org/test/01/12312312312319?99=TESTING123")
 
         gs1encoder.free()
     }
@@ -55,7 +55,7 @@ final class GS1EncoderTests: XCTestCase {
 
         try gs1encoder.setSym(.QR)
         XCTAssertEqual(gs1encoder.getSym(), .QR)
-        XCTAssertEqual(gs1encoder.getScanData(), "]Q3011231231231231999TESTING123")
+        XCTAssertEqual(try gs1encoder.getScanData(), "]Q3011231231231231999TESTING123")
 
         gs1encoder.free()
     }
@@ -89,7 +89,7 @@ final class GS1EncoderTests: XCTestCase {
 
         try gs1encoder.setSym(.DataBarExpanded)
         XCTAssertEqual(gs1encoder.getSym(), .DataBarExpanded)
-        XCTAssertEqual(gs1encoder.getScanData(), "]e00212312312312319")
+        XCTAssertEqual(try gs1encoder.getScanData(), "]e00212312312312319")
 
         gs1encoder.free()
     }
@@ -113,7 +113,13 @@ final class GS1EncoderTests: XCTestCase {
         XCTAssertFalse(gs1encoder.getPermitZeroSuppressedGTINinDLuris())
         XCTAssertFalse(gs1encoder.getIncludeDataTitlesInHRI())
         XCTAssertNil(gs1encoder.getAIdataStr())
-        XCTAssertNil(gs1encoder.getScanData())
+        XCTAssertThrowsError(try gs1encoder.getScanData()) { error in
+            guard case GS1EncoderError.scanDataError(let msg) = error else {
+                XCTFail("Expected scanDataError")
+                return
+            }
+            XCTAssertTrue(msg.contains("No symbology selected"), "Error message should contain 'No symbology selected'")
+        }
         XCTAssertEqual(gs1encoder.getHRI(), [])
         XCTAssertEqual(gs1encoder.getDLignoredQueryParams(), [])
         XCTAssertEqual(gs1encoder.getErrMarkup(), "")
@@ -192,7 +198,13 @@ final class GS1EncoderTests: XCTestCase {
 
         try gs1encoder.setDataStr("TESTING")
         XCTAssertNil(gs1encoder.getAIdataStr())
-        XCTAssertNil(gs1encoder.getScanData())
+        XCTAssertThrowsError(try gs1encoder.getScanData()) { error in
+            guard case GS1EncoderError.scanDataError(let msg) = error else {
+                XCTFail("Expected scanDataError")
+                return
+            }
+            XCTAssertTrue(msg.contains("No symbology selected"), "Error message should contain 'No symbology selected'")
+        }
         XCTAssertEqual(gs1encoder.getHRI(), [])
         XCTAssertEqual(gs1encoder.getDLignoredQueryParams(), [])
         XCTAssertThrowsError(try gs1encoder.getDLuri()) { error in

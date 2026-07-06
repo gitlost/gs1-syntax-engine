@@ -358,7 +358,9 @@ export class GS1encoder {
      * The output will be prefixed with the appropriate AIM symbology identifier.
      *
      * @type {string}
-     * @throws {@link GS1encoderParameterException}
+     * @throws {@link GS1encoderScanDataException} when getting, if no symbology is
+     * selected or the current data cannot be represented in the selected symbology
+     * @throws {@link GS1encoderScanDataException} when setting, if the scan data is invalid
      */
     get scanData(): string;
     /**

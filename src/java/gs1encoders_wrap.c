@@ -214,7 +214,7 @@ JNIEXPORT jstring JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetAIdat
         jobject obj,
         jlong ctx) {
     char *out = gs1_encoder_getAIdataStr((gs1_encoder*)ctx);
-    return (*env)->NewStringUTF(env, out);
+    return out ? (*env)->NewStringUTF(env, out) : NULL;
 }
 
 JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetAIdataStrJNI(
@@ -240,7 +240,7 @@ JNIEXPORT jstring JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetScanD
         jobject obj,
         jlong ctx) {
     char *out = gs1_encoder_getScanData((gs1_encoder*)ctx);
-    return (*env)->NewStringUTF(env, out);
+    return out ? (*env)->NewStringUTF(env, out) : NULL;
 }
 
 JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetScanDataJNI(
@@ -284,7 +284,7 @@ JNIEXPORT jstring JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetDLuri
     if (isCopy == JNI_TRUE)
         (*env)->ReleaseStringUTFChars(env, stem, str);
 
-    return (*env)->NewStringUTF(env, out);
+    return out ? (*env)->NewStringUTF(env, out) : NULL;
 }
 
 JNIEXPORT jobjectArray JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetHRIJNI(

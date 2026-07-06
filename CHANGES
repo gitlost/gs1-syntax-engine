@@ -1,3 +1,10 @@
+X.X.X
+
+* Core: `gs1_encoder_getScanData()` now reports an error that can be read using `gs1_encoder_getErrMsg()` on every failure path.
+* Wrappers: Getting the scan data now throws a scan data exception on failure, consistent with the existing behaviour when getting a GS1 Digital Link URI. Previously the scan data getters returned null or an empty string, indistinguishable from benign absence.
+* Java: The JNI wrapper no longer encounters undefined behaviour when the underlying C library getters return no value.
+
+
 1.4.1
 
 * Core: Hardened the Syntax Dictionary loader against malformed or hostile custom dictionaries.

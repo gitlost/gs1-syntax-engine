@@ -727,10 +727,15 @@ public class GS1Encoder implements AutoCloseable {
      * <p>
      * The output will be prefixed with the appropriate AIM symbology identifier.
      *
-     * @return the expected scan data string, or {@code null} if no symbology is set
+     * @return the expected scan data string
+     * @throws GS1EncoderScanDataException if no symbology is selected or the current
+     *         data cannot be represented in the selected symbology
      */
-    public String getScanData() {
-        return gs1encoderGetScanDataJNI(ctx);
+    public String getScanData() throws GS1EncoderScanDataException {
+        String out = gs1encoderGetScanDataJNI(ctx);
+        if (out == null)
+            throw new GS1EncoderScanDataException(this.getErrMsg());
+        return out;
     }
 
     /**

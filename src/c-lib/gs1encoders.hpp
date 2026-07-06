@@ -746,16 +746,19 @@ public:
 	/// symbol of the currently selected symbology containing the
 	/// current input data. The output is prefixed with the appropriate
 	/// AIM Symbology Identifier (e.g. `]Q3...` for GS1 QR Code,
-	/// `]C1...` for GS1-128 with composite). Returns an empty string
-	/// when no symbology is selected.
+	/// `]C1...` for GS1-128 with composite).
 	///
-	/// @return the scan data string, or an empty string when no
-	///         symbology is selected.
+	/// @return the scan data string.
+	/// @throws GS1EncoderScanDataException if no symbology is selected
+	///         or the current data cannot be represented in the
+	///         selected symbology.
 	/// @see set_scan_data()
 	/// @see sym()
 	std::string scan_data() const {
 		const char *s = gs1_encoder_getScanData(ctx_);
-		return s ? s : std::string();
+		if (!s)
+			throw GS1EncoderScanDataException(get_err_msg());
+		return s;
 	}
 	/// @brief Process normalised scan data received from a barcode
 	/// reader.

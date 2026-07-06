@@ -113,7 +113,10 @@ public class GS1EncoderTest {
         assertFalse(gs1encoder.getPermitZeroSuppressedGTINinDLuris());
         assertFalse(gs1encoder.getIncludeDataTitlesInHRI());
         assertNull(gs1encoder.getAIdataStr());
-        assertNull(gs1encoder.getScanData());
+        GS1EncoderScanDataException eScanData = assertThrows(GS1EncoderScanDataException.class, () -> {
+            gs1encoder.getScanData();
+        });
+        assertTrue(eScanData.getMessage().contains("No symbology selected"));
         assertArrayEquals(new String[]{}, gs1encoder.getHRI());
         assertArrayEquals(new String[]{}, gs1encoder.getDLignoredQueryParams());
         assertEquals("", gs1encoder.getErrMarkup());
@@ -192,7 +195,10 @@ public class GS1EncoderTest {
 
         gs1encoder.setDataStr("TESTING");
         assertNull(gs1encoder.getAIdataStr());
-        assertNull(gs1encoder.getScanData());
+        GS1EncoderScanDataException eScanData = assertThrows(GS1EncoderScanDataException.class, () -> {
+            gs1encoder.getScanData();
+        });
+        assertTrue(eScanData.getMessage().contains("No symbology selected"));
         assertArrayEquals(new String[]{}, gs1encoder.getHRI());
         assertArrayEquals(new String[]{}, gs1encoder.getDLignoredQueryParams());
         GS1EncoderDigitalLinkException e = assertThrows(GS1EncoderDigitalLinkException.class, () -> {

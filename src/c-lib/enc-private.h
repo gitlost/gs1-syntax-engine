@@ -40,7 +40,7 @@
 #define ssize_t ptrdiff_t
 #define alloca _alloca
 #else
-#  include <sys/types.h>				// IWYU pragma: export
+#  include <sys/types.h>			// IWYU pragma: export
 #  if (defined(__GNUC__) && !defined(alloca) && !defined(__NetBSD__)) || defined(__NuttX__) || defined(_AIX) \
         || (defined(__sun) && defined(__SVR4) /*Solaris*/)
 #    include <alloca.h>				// IWYU pragma: export
@@ -99,10 +99,49 @@
 #endif
 
 
+/*
+ *  The whole gs1_encoder is one allocation, so ASan cannot see an overrun from
+ *  one internal buffer into the next field (its redzones sit only between
+ *  allocations). Under ASan we insert poisoned guard regions after the large
+ *  scratch buffers; an overrun is caught once it reaches the guard (8-byte
+ *  shadow granularity). No effect on non-sanitiser builds.
+ *
+ */
+#if defined(__SANITIZE_ADDRESS__)
+#  define GS1_ENCODERS_HAVE_ASAN
+#elif defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#    define GS1_ENCODERS_HAVE_ASAN
+#  endif
+#endif
+
+// Structure-agnostic primitives. A struct declares a guard after each protected
+// buffer with GS1_ENCODERS_ASAN_GUARD(), and lists them once as an X-macro:
+//   #define FOO_GUARDS(GUARD, s)  GUARD(s, buf1) GUARD(s, buf2) ...
+// over which GS1_ENCODERS_{POISON,UNPOISON}_GUARDS() expand for a given instance.
+#ifdef GS1_ENCODERS_HAVE_ASAN
+#include <sanitizer/asan_interface.h>
+#define GS1_ENCODERS_ASAN_GUARD(field)			char field##_guard[64];
+#define GS1_ENCODERS_ASAN_POISON_GUARD(s,   field)	ASAN_POISON_MEMORY_REGION((s)->field##_guard,   sizeof((s)->field##_guard));
+#define GS1_ENCODERS_ASAN_UNPOISON_GUARD(s, field)	ASAN_UNPOISON_MEMORY_REGION((s)->field##_guard, sizeof((s)->field##_guard));
+#define GS1_ENCODERS_POISON_GUARDS(guards,   s)		do { guards(GS1_ENCODERS_ASAN_POISON_GUARD,   s) } while (0)
+#define GS1_ENCODERS_UNPOISON_GUARDS(guards, s)		do { guards(GS1_ENCODERS_ASAN_UNPOISON_GUARD, s) } while (0)
+#else
+#define GS1_ENCODERS_ASAN_GUARD(field)
+#define GS1_ENCODERS_POISON_GUARDS(guards,   s)		((void)0)
+#define GS1_ENCODERS_UNPOISON_GUARDS(guards, s)		((void)0)
+#endif
+
+
 #define GS1_SEARCH_INVALID   (-2)
 #define GS1_SEARCH_NOT_FOUND (-1)
 
 #define SIZEOF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
+
+// Portable compile-time assertion
+#define GS1_ENCODERS_STATIC_ASSERT_(cond, id)	typedef char gs1_encoders_static_assert_##id[(cond) ? 1 : -1]
+#define GS1_ENCODERS_STATIC_ASSERT__(cond, id)	GS1_ENCODERS_STATIC_ASSERT_(cond, id)
+#define GS1_ENCODERS_STATIC_ASSERT(cond)	GS1_ENCODERS_STATIC_ASSERT__(cond, __LINE__)
 
 
 #include "ai.h"
@@ -208,6 +247,9 @@ typedef enum {
 	gs1_encoder_eSYNTAX_DICTIONARY_LINE_EXCEEDS_IMPL,
 	gs1_encoder_eSYNTAX_DICTIONARY_LINE_ERROR,
 	gs1_encoder_eDOMAIN_CONTAINS_ILLEGAL_CHARACTERS,
+	gs1_encoder_eAI_VALUE_LENGTH_EXCEEDS_IMPL,
+	gs1_encoder_eAI_TITLE_TOO_LONG,
+	gs1_encoder_eNO_SYMBOLOGY_SELECTED,
 	__GS1_ENCODERS_NUM_ERRS
 } gs1_encoder_err_t;
 
@@ -223,14 +265,25 @@ struct gs1_encoder {
 	bool includeDataTitlesInHRI;		// Whether to include the Data Titles in HRI string output
 
 	char errMsg[512];			// The translated error message
+	GS1_ENCODERS_ASAN_GUARD(errMsg)
+
 	gs1_encoder_err_t err;			// The error
 	gs1_lint_err_t linterErr;		// Error returned by a linter
+
 	char linterErrMarkup[512];
+	GS1_ENCODERS_ASAN_GUARD(linterErrMarkup)
 
 	char dataStr[MAX_DATA+1];		// Input data buffer passed to the encoders
+	GS1_ENCODERS_ASAN_GUARD(dataStr)
+
 	char dlAIbuffer[MAX_DATA+1];		// Populated with unbracketed AI string extracted from DL input
+	GS1_ENCODERS_ASAN_GUARD(dlAIbuffer)
+
 	char outStr[2*MAX_DATA+1];		// Buffer to return formatted data
+	GS1_ENCODERS_ASAN_GUARD(outStr)
+
 	char *outHRI[MAX_AIS];			// Array of AI element string for HRI printing
+	GS1_ENCODERS_ASAN_GUARD(outHRI)
 
 	bool localAlloc;			// True if we malloc()ed this struct
 	FILE *outfp;
@@ -240,9 +293,12 @@ struct gs1_encoder {
 	bool aiTableIsDynamic;			// True if the AI table is loaded from the Syntax Dictionary
 
 	struct aiValue aiData[MAX_AIS];		// List of AI components
+	GS1_ENCODERS_ASAN_GUARD(aiData)
 	int numAIs;
-	struct aiValue *sortedAIs[MAX_AIS];		// Sorted pointers to aiData entries
-	int numSortedAIs;				// Number of entries in sortedAIs
+
+	struct aiValue *sortedAIs[MAX_AIS];	// Sorted pointers to aiData entries
+	GS1_ENCODERS_ASAN_GUARD(sortedAIs)
+	int numSortedAIs;			// Number of entries in sortedAIs
 
 	struct validationEntry validationTable[gs1_encoder_vNUMVALIDATIONS];
 						// Table of all global validation functions
@@ -253,6 +309,32 @@ struct gs1_encoder {
 	int numDLkeyQualifiers;			// Number of dlKeyQualifiers strings
 
 };
+
+
+/*
+ *  Compile-time guarantee that every per-AI output line fits within its share
+ *  of outStr (sizeof(outStr) / MAX_AIS), so that MAX_AIS lines never overrun it.
+ *  The loader caps AI value and data title lengths so these bounds hold:
+ *
+ *    getHRI:       "data_title (AI) value\0"
+ *    getAIdataStr: "(AI)" then the value with each byte escaped ("(" -> "\(")
+ *
+ */
+GS1_ENCODERS_STATIC_ASSERT(sizeof(((struct gs1_encoder *)0)->outStr) / MAX_AIS >= MAX_AI_TITLE_LEN + MAX_AI_LEN + MAX_AI_VALUE_LEN + 5);
+GS1_ENCODERS_STATIC_ASSERT(sizeof(((struct gs1_encoder *)0)->outStr) / MAX_AIS >= MAX_AI_LEN + 2*MAX_AI_VALUE_LEN + 2);
+
+
+// The guarded buffers of a gs1_encoder, declared once; passed to
+// GS1_ENCODERS_{POISON,UNPOISON}_GUARDS() to act on every guard of an instance
+#define GS1_ENCODER_GUARDS(GUARD, s)	\
+	GUARD(s, errMsg)		\
+	GUARD(s, linterErrMarkup)	\
+	GUARD(s, dataStr)		\
+	GUARD(s, dlAIbuffer)		\
+	GUARD(s, outStr)		\
+	GUARD(s, outHRI)		\
+	GUARD(s, aiData)		\
+	GUARD(s, sortedAIs)
 
 
 /*
@@ -330,6 +412,7 @@ void test_api_copyDLignoredQueryParams(void);
 void test_api_allocFailures(void);
 #ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 void test_api_brokenPrefixSyndict(void);
+void test_api_tooManyDLkeyQualifiersSyndict(void);
 #endif
 
 #endif

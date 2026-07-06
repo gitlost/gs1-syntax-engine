@@ -116,7 +116,11 @@ namespace GS1EncodersTest
             Assert.IsFalse(gs1encoder.PermitZeroSuppressedGTINinDLuris);
             Assert.IsFalse(gs1encoder.IncludeDataTitlesInHRI);
             Assert.IsNull(gs1encoder.AIdataStr);
-            Assert.IsNull(gs1encoder.ScanData);
+            GS1EncoderScanDataException eScanData = Assert.ThrowsExactly<GS1EncoderScanDataException>(() =>
+            {
+                _ = gs1encoder.ScanData;
+            });
+            Assert.IsTrue(eScanData.Message.Contains("No symbology selected"));
             Assert.AreEqual(0, gs1encoder.HRI.Length);
             Assert.AreEqual(0, gs1encoder.DLignoredQueryParams.Length);
             Assert.AreEqual("", gs1encoder.ErrMarkup);
@@ -192,7 +196,11 @@ namespace GS1EncodersTest
 
             gs1encoder.DataStr = "TESTING";
             Assert.IsNull(gs1encoder.AIdataStr);
-            Assert.IsNull(gs1encoder.ScanData);
+            GS1EncoderScanDataException eScanData = Assert.ThrowsExactly<GS1EncoderScanDataException>(() =>
+            {
+                _ = gs1encoder.ScanData;
+            });
+            Assert.IsTrue(eScanData.Message.Contains("No symbology selected"));
             Assert.AreEqual(0, gs1encoder.HRI.Length);
             Assert.AreEqual(0, gs1encoder.DLignoredQueryParams.Length);
 

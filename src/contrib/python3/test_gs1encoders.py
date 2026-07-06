@@ -23,6 +23,7 @@ from gs1encoders import (
     GS1Encoder,
     GS1EncoderDigitalLinkException,
     GS1EncoderParameterException,
+    GS1EncoderScanDataException,
     Symbology,
     Validation,
 )
@@ -111,7 +112,9 @@ class GS1EncoderTest(unittest.TestCase):
         self.assertFalse(gs1encoder.permit_zero_suppressed_gtin_in_dl_uris)
         self.assertFalse(gs1encoder.include_data_titles_in_hri)
         self.assertIsNone(gs1encoder.ai_data_str)
-        self.assertIsNone(gs1encoder.scan_data)
+        with self.assertRaises(GS1EncoderScanDataException) as cm:
+            gs1encoder.scan_data
+        self.assertIn("No symbology selected", str(cm.exception))
         self.assertEqual(gs1encoder.hri, [])
         self.assertEqual(gs1encoder.dl_ignored_query_params, [])
         self.assertEqual(gs1encoder.err_markup, "")
@@ -173,7 +176,9 @@ class GS1EncoderTest(unittest.TestCase):
 
         gs1encoder.data_str = "TESTING"
         self.assertIsNone(gs1encoder.ai_data_str)
-        self.assertIsNone(gs1encoder.scan_data)
+        with self.assertRaises(GS1EncoderScanDataException) as cm:
+            gs1encoder.scan_data
+        self.assertIn("No symbology selected", str(cm.exception))
         self.assertEqual(gs1encoder.hri, [])
         self.assertEqual(gs1encoder.dl_ignored_query_params, [])
         with self.assertRaises(GS1EncoderDigitalLinkException) as ctx:

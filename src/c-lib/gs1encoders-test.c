@@ -81,6 +81,7 @@ TEST_LIST = {
     { "api_allocFailures", test_api_allocFailures },
 #ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
     { "api_brokenPrefixSyndict", test_api_brokenPrefixSyndict },
+    { "api_tooManyDLkeyQualifiersSyndict", test_api_tooManyDLkeyQualifiersSyndict },
 #endif
 
 
@@ -93,6 +94,7 @@ TEST_LIST = {
     { "syn_attrTemplateForm", test_syn_attrTemplateForm },
     { "syn_allocFailures", test_syn_allocFailures },
     { "syn_capacityOverflow", test_syn_capacityOverflow },
+    { "syn_cannotReadFile", test_syn_cannotReadFile },
     { "syn_strdupFailures", test_syn_strdupFailures },
     { "syn_lineTooLong", test_syn_lineTooLong },
     { "syn_nulLeadingLine", test_syn_nulLeadingLine },

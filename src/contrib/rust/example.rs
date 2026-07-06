@@ -84,8 +84,8 @@ fn main() {
 
     // Scan data round-trip
     match gs1encoder.get_scan_data() {
-        Some(scan_data) => println!("Scan data: {}", scan_data),
-        None => println!("Scan data: None"),
+        Ok(scan_data) => println!("Scan data: {}", scan_data),
+        Err(e) => println!("Scan data: Failed: {}", e),
     }
 
     // DL ignored query params

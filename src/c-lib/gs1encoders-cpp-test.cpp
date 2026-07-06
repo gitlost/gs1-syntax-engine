@@ -68,7 +68,8 @@ static void test_construct_with_missing_syndict_throws(void) {
 		gs1encoders::GS1Encoder gs(
 			gs1encoders::InitOpts{}.syntax_dictionary(
 				"/nonexistent/path/dict.txt"));
-	} catch (const gs1encoders::GS1EncoderGeneralException &) {
+	} catch (const gs1encoders::GS1EncoderGeneralException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
 		threw = true;
 	}
 	TEST_CHECK(threw);
@@ -168,7 +169,8 @@ static void test_set_sym_invalid_throws(void) {
 	bool threw = false;
 	try {
 		gs.set_sym(gs1encoders::Symbology::NumSyms);
-	} catch (const gs1encoders::GS1EncoderParameterException &) {
+	} catch (const gs1encoders::GS1EncoderParameterException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
 		threw = true;
 	}
 	TEST_CHECK(threw);
@@ -279,7 +281,27 @@ static void test_set_scan_data_invalid_throws(void) {
 	bool threw = false;
 	try {
 		gs.set_scan_data("garbage");
-	} catch (const gs1encoders::GS1EncoderScanDataException &) {
+	} catch (const gs1encoders::GS1EncoderScanDataException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
+		threw = true;
+	}
+	TEST_CHECK(threw);
+}
+
+static void test_scan_data(void) {
+	gs1encoders::GS1Encoder gs;
+	gs.set_sym(gs1encoders::Symbology::QR);
+	gs.set_data_str("^011231231231233310ABC123");
+	TEST_CHECK(gs.scan_data() == "]Q3011231231231233310ABC123");
+}
+
+static void test_scan_data_no_sym_throws(void) {
+	gs1encoders::GS1Encoder gs;
+	bool threw = false;
+	try {
+		gs.scan_data();
+	} catch (const gs1encoders::GS1EncoderScanDataException &e) {
+		TEST_CHECK(std::string(e.what()).length() > 0);
 		threw = true;
 	}
 	TEST_CHECK(threw);
@@ -337,6 +359,8 @@ TEST_LIST = {
 	/* Scan data */
 	{ "set_scan_data",                      test_set_scan_data },
 	{ "set_scan_data_invalid_throws",       test_set_scan_data_invalid_throws },
+	{ "scan_data",                          test_scan_data },
+	{ "scan_data_no_sym_throws",            test_scan_data_no_sym_throws },
 
 	{ NULL, NULL }
 };

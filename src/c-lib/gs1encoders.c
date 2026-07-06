@@ -113,6 +113,8 @@ gs1_encoder* gs1_encoder_init_ex(void *mem, const gs1_encoder_init_opts_t *opts)
 		ctx = mem;
 	}
 
+	GS1_ENCODERS_UNPOISON_GUARDS(GS1_ENCODER_GUARDS, ctx);	// Clear any poison left from a prior use of caller-provided storage
+
 	// Set default parameters
 	ctx = memcpy(ctx, (&(struct gs1_encoder) {
 		.localAlloc = !mem,
@@ -134,6 +136,8 @@ gs1_encoder* gs1_encoder_init_ex(void *mem, const gs1_encoder_init_opts_t *opts)
 		.linterErr = GS1_LINTER_OK,
 		.linterErrMarkup = { 0 }
 	}), sizeof(struct gs1_encoder));
+
+	GS1_ENCODERS_POISON_GUARDS(GS1_ENCODER_GUARDS, ctx);
 
 	if (status) *status = GS1_ENCODERS_INIT_SUCCESS;
 	if (msgBuf && msgBufSize > 0)
@@ -233,6 +237,7 @@ void gs1_encoder_free(gs1_encoder* const ctx) {
 #endif
 
 	gs1_freeDLkeyQualifiers(ctx);
+	GS1_ENCODERS_UNPOISON_GUARDS(GS1_ENCODER_GUARDS, ctx);
 	if (ctx->localAlloc)
 		GS1_ENCODERS_FREE(ctx);
 }
@@ -444,7 +449,7 @@ bool gs1_encoder_setAIdataStr(gs1_encoder* const ctx, const char* const aiData) 
 
 		*cc = '\0';					// Delimit end of linear component
 
-		if (!gs1_parseAIdata(ctx, aiData, ctx->dataStr))
+		if (!gs1_parseAIdata(ctx, aiData, ctx->dataStr, MAX_DATA))
 			goto fail;
 
 		if (ctx->numAIs >= MAX_AIS) {
@@ -453,20 +458,26 @@ bool gs1_encoder_setAIdataStr(gs1_encoder* const ctx, const char* const aiData) 
 		}
 
 		p = ctx->dataStr + strlen(ctx->dataStr);
+		// LCOV_EXCL_START: unreachable while MAX_AIS x MAX_AI_VALUE_LEN caps the linear output far below MAX_DATA; defence in depth for the capacity arithmetic below
+		if ((size_t)(p - ctx->dataStr) >= MAX_DATA) {	// No room for separator and composite component
+			SET_ERR_V(DATA_TOO_LONG, MAX_DATA);
+			goto fail;
+		}
+		// LCOV_EXCL_STOP
 		*p++ = '|';
 
 		// Indicate separator in HRI
 		ctx->aiData[ctx->numAIs].kind = aiValue_ccsep;
 		ctx->numAIs++;
 
-		if (!gs1_parseAIdata(ctx, cc+1, p))
+		if (!gs1_parseAIdata(ctx, cc+1, p, MAX_DATA - (size_t)(p - ctx->dataStr)))
 			goto fail;
 
 		*cc = '|';					// Restore original "|"
 
 	}
 	else {							// Linear-only symbol
-		if (!gs1_parseAIdata(ctx, aiData, ctx->dataStr))
+		if (!gs1_parseAIdata(ctx, aiData, ctx->dataStr, MAX_DATA))
 			goto fail;
 	}
 
@@ -576,17 +587,17 @@ int gs1_encoder_getHRI(gs1_encoder* const ctx, char*** const out) {
 
 		assert(ai->aiEntry);
 
-		ctx->outHRI[j] = p;
-
 		if (ctx->includeDataTitlesInHRI && *ai->aiEntry->title != '\0')
 			title_len = strlen(ai->aiEntry->title);
 
 		/*
-		 *  "data_title (AI) VALUE" or "(AI) VALUE"
+		 *  "data_title (AI) VALUE" or "(AI) VALUE". The AI value, data title
+		 *  and AI count limits guarantee (see the outStr line-budget assert)
+		 *  that each line fits its share of outStr, so MAX_AIS lines cannot
+		 *  overrun it.
 		 *
 		 */
-		assert((title_len > 0 ? title_len + 1 : 0) + (size_t)ai->ailen + (size_t)ai->vallen + 4 <
-		       sizeof(ctx->outStr) - (size_t)(p - ctx->outStr));
+		ctx->outHRI[j] = p;
 
 		if (title_len > 0) {
 			memcpy(p, ai->aiEntry->title, title_len);
@@ -1115,6 +1126,7 @@ void test_api_sym(void) {
 	assert(ctx);
 
 	TEST_CHECK(!gs1_encoder_setSym(ctx, gs1_encoder_sNONE - 1));     // Too small
+	TEST_CHECK(ctx->err == gs1_encoder_eUNKNOWN_SYMBOLOGY);
 
 	TEST_CHECK(gs1_encoder_setSym(ctx, gs1_encoder_sNONE));          // First
 	TEST_CHECK(gs1_encoder_getSym(ctx) == gs1_encoder_sNONE);
@@ -1154,6 +1166,7 @@ void test_api_sym(void) {
 	TEST_CHECK(gs1_encoder_getSym(ctx) == gs1_encoder_sNUMSYMS - 1);
 
 	TEST_CHECK(!gs1_encoder_setSym(ctx, gs1_encoder_sNUMSYMS));      // Too big
+	TEST_CHECK(ctx->err == gs1_encoder_eUNKNOWN_SYMBOLOGY);
 
 	// cppcheck-suppress knownConditionTrueFalse
 	TEST_CHECK(gs1_encoder_sNUMSYMS == 15);  // Remember to change when adding new symbologies
@@ -1277,9 +1290,11 @@ void test_api_validations(void) {
 	// Locked validation (always enabled)
 	TEST_CHECK(gs1_encoder_getValidationEnabled(ctx, gs1_encoder_vREPEATED_AIS));		// Default
 	TEST_CHECK(!gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vREPEATED_AIS, false));
+	TEST_CHECK(ctx->err == gs1_encoder_eVALIDATION_CANNOT_BE_AMENDED);
 
 	// Out-of-range index must be rejected by both setter and getter, not indexed
 	TEST_CHECK(!gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vNUMVALIDATIONS, true));
+	TEST_CHECK(ctx->err == gs1_encoder_eUNKNOWN_VALIDATION);
 	TEST_CHECK(!gs1_encoder_getValidationEnabled(ctx, gs1_encoder_vNUMVALIDATIONS));
 	TEST_CHECK(strlen(gs1_encoder_getErrMsg(ctx)) > 0);					// Error reported
 
@@ -1312,6 +1327,7 @@ void test_api_getters(void) {
 	 */
 	TEST_CHECK(strcmp(gs1_encoder_getErrMsg(ctx), "") == 0);	// No error yet
 	TEST_CHECK(!gs1_encoder_setSym(ctx, gs1_encoder_sNUMSYMS));	// Trigger error
+	TEST_CHECK(ctx->err == gs1_encoder_eUNKNOWN_SYMBOLOGY);
 	TEST_CHECK(strlen(gs1_encoder_getErrMsg(ctx)) > 0);		// Non-empty
 
 	/*
@@ -1322,7 +1338,15 @@ void test_api_getters(void) {
 
 	// Trigger a linter error: bad check digit in AI (01)
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, "^0112312312312334"));	// Wrong check digit
+	TEST_CHECK(ctx->err == gs1_encoder_eAI_LINTER_ERROR);
 	TEST_CHECK(strlen(gs1_encoder_getErrMarkup(ctx)) > 0);
+
+	// A subsequent successful operation clears all error state
+	TEST_CHECK(gs1_encoder_setDataStr(ctx, "^0112312312312333"));
+	TEST_CHECK(ctx->err == gs1_encoder_eNO_ERROR);
+	TEST_CHECK(strcmp(gs1_encoder_getErrMsg(ctx), "") == 0);
+	TEST_CHECK(ctx->linterErr == GS1_LINTER_OK);
+	TEST_CHECK(strcmp(gs1_encoder_getErrMarkup(ctx), "") == 0);
 
 	/*
 	 *  gs1_encoder_getDLuri: with primary key
@@ -1339,6 +1363,7 @@ void test_api_getters(void) {
 	TEST_ASSERT(gs1_encoder_setDataStr(ctx, "^99XYZ"));
 	out = gs1_encoder_getDLuri(ctx, "https://example.com");
 	TEST_CHECK(out == NULL);
+	TEST_CHECK(ctx->err == gs1_encoder_eCANNOT_CREATE_DL_URI_WITHOUT_PRIMARY_KEY_AI);
 
 	/*
 	 *  gs1_encoder_setAIdataStr: composite path
@@ -1490,6 +1515,7 @@ void test_api_getters(void) {
 	 *
 	 */
 	TEST_CHECK(!gs1_encoder_setValidationEnabled(ctx, gs1_encoder_vNUMVALIDATIONS, false));
+	TEST_CHECK(ctx->err == gs1_encoder_eUNKNOWN_VALIDATION);
 
 	/*
 	 *  gs1_encoder_copyDLignoredQueryParams: buffer overflow
@@ -1527,6 +1553,7 @@ void test_api_dataStr(void) {
 	}
 	bigbuffer[MAX_DATA+1]='\0';
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, bigbuffer));  // Too long
+	TEST_CHECK(ctx->err == gs1_encoder_eDATA_TOO_LONG);
 
 	bigbuffer[MAX_DATA]='\0';
 	TEST_CHECK(gs1_encoder_setDataStr(ctx, bigbuffer));   // Maximum length
@@ -1559,6 +1586,7 @@ void test_api_dataStr(void) {
 		*p++ = '9'; *p++ = '9'; *p++ = 'X'; *p++ = 'Y';
 		*p = '\0';
 		TEST_CHECK(!gs1_encoder_setDataStr(ctx, bigbuffer));	// 65 AIs, too many
+		TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_AIS);
 	}
 
 
@@ -1584,6 +1612,7 @@ void test_api_dataStr(void) {
 		*p++ = '^'; *p++ = '9'; *p++ = '9'; *p++ = 'X'; *p++ = 'Y';
 		*p = '\0';
 		TEST_CHECK(!gs1_encoder_setDataStr(ctx, bigbuffer));	// Linear fills MAX_AIS, composite overflows
+		TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_AIS);
 	}
 
 
@@ -1623,6 +1652,7 @@ void test_api_dataStr(void) {
 		*p++ = '^'; *p++ = '9'; *p++ = '9'; *p++ = 'X'; *p++ = 'Y';
 		*p = '\0';
 		TEST_CHECK(!gs1_encoder_setDataStr(ctx, bigbuffer));	// 63 + 1 sep + 1 = 65, overflows in composite
+		TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_AIS);
 	}
 
 
@@ -1636,22 +1666,27 @@ void test_api_dataStr(void) {
 		// Invalid AI in linear part of composite
 		strcpy(buf, "(BADAI)DATA|(99)XYZ");
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, buf));
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_UNRECOGNISED);
 
 		// Invalid AI in linear-only path
 		strcpy(buf, "(BADAI)DATA");
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, buf));
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_UNRECOGNISED);
 
 		// Invalid AI in CC part of composite
 		strcpy(buf, "(01)12312312312333|(BADAI)XYZ");
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, buf));
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_UNRECOGNISED);
 
 		// Validation failure: bad GTIN check digit
 		strcpy(buf, "(01)12312312312334");
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, buf));
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_LINTER_ERROR);
 
 		// Validation failure: repeated AI with different values
 		strcpy(buf, "(99)ABC(99)XYZ");
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, buf));
+		TEST_CHECK(ctx->err == gs1_encoder_eINSTANCES_OF_AI_HAVE_DIFFERENT_VALUES);
 	}
 
 
@@ -1675,6 +1710,7 @@ void test_api_dataStr(void) {
 		*p++ = 'X'; *p++ = 'Y';
 		*p = '\0';
 		TEST_CHECK(!gs1_encoder_setAIdataStr(ctx, bigbuffer));
+		TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_AIS);
 	}
 
 
@@ -1685,18 +1721,23 @@ void test_api_dataStr(void) {
 
 	// DL URI parse failure: no valid AI in URI
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, "https://a/NOPRIMARYAI"));
+	TEST_CHECK(ctx->err == gs1_encoder_eNO_GS1_DL_KEYS_FOUND_IN_PATH_INFO);
 
 	// Linear AI parse failure: too short for AI 00 (needs 18 digits)
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, "^00SHORT"));
+	TEST_CHECK(ctx->err == gs1_encoder_eAI_DATA_HAS_INCORRECT_LENGTH);
 
 	// Validation failure: bad GTIN check digit
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, "^0112312312312334"));
+	TEST_CHECK(ctx->err == gs1_encoder_eAI_LINTER_ERROR);
 
 	// Composite: linear component AI parse failure
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, "^00SHORT|^99XYZ"));
+	TEST_CHECK(ctx->err == gs1_encoder_eAI_DATA_HAS_INCORRECT_LENGTH);
 
 	// Validation failure: repeated AI with different values
 	TEST_CHECK(!gs1_encoder_setDataStr(ctx, "^99ABC^99XYZ"));
+	TEST_CHECK(ctx->err == gs1_encoder_eINSTANCES_OF_AI_HAVE_DIFFERENT_VALUES);
 
 
 	gs1_encoder_free(ctx);
@@ -1829,6 +1870,7 @@ void test_api_setScanData(void) {
 		bigbuffer[3 + MAX_DATA - 1] = 'a';
 		bigbuffer[3 + MAX_DATA] = '\0';
 		TEST_CHECK(!gs1_encoder_setScanData(ctx, bigbuffer));
+		TEST_CHECK(ctx->err == gs1_encoder_eDATA_TOO_LONG);
 	}
 
 
@@ -1838,6 +1880,7 @@ void test_api_setScanData(void) {
 	 *
 	 */
 	TEST_CHECK(!gs1_encoder_setScanData(ctx, "]C199ABC" "\x1D" "99XYZ"));
+	TEST_CHECK(ctx->err == gs1_encoder_eINSTANCES_OF_AI_HAVE_DIFFERENT_VALUES);
 
 
 	gs1_encoder_free(ctx);
@@ -2249,6 +2292,49 @@ void test_api_brokenPrefixSyndict(void) {
 		TEST_CHECK(ctx != NULL);	// setAItable falls back to embedded
 		if (ctx) gs1_encoder_free(ctx);
 	}
+
+	// Same entries installed directly: setAItable rejects the table and
+	// falls back to embedded, leaving the specific error reported
+	{
+		gs1_encoder *ctx;
+		struct aiEntry *sd;
+
+		TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+		assert(ctx);
+		TEST_ASSERT((sd = gs1_loadSyntaxDictionary(ctx, path)) != NULL);
+		gs1_freeDLkeyQualifiers(ctx);
+		TEST_CHECK(gs1_setAItable(ctx, sd));
+		TEST_CHECK(ctx->err == gs1_encoder_eAI_TABLE_BROKEN_PREFIXES_DIFFER_IN_LENGTH);
+		gs1_encoder_free(ctx);
+	}
+
+	remove(path);
+
+}
+
+
+void test_api_tooManyDLkeyQualifiersSyndict(void) {
+
+	const char* const path = "test-syndict-dlpkey-limit.txt";
+	FILE *fp;
+	gs1_encoder *ctx;
+	struct aiEntry *sd;
+
+	fp = fopen(path, "w");
+	TEST_ASSERT(fp != NULL);
+	if (!fp) return;
+	fputs("8888  ?  N4  dlpkey=10,11,12,13,14,15  # T\n", fp);	// One over MAX_DL_KEY_QUALIFIERS
+	fclose(fp);
+
+	// setAItable rejects the table and falls back to embedded, leaving
+	// the specific error reported
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+	assert(ctx);
+	TEST_ASSERT((sd = gs1_loadSyntaxDictionary(ctx, path)) != NULL);
+	gs1_freeDLkeyQualifiers(ctx);
+	TEST_CHECK(gs1_setAItable(ctx, sd));
+	TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_DL_KEY_QUALIFIERS);
+	gs1_encoder_free(ctx);
 
 	remove(path);
 

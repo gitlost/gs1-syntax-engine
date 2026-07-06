@@ -287,13 +287,13 @@ impl GS1Encoder {
         Ok(())
     }
 
-    pub fn get_scan_data(&self) -> Option<String> {
+    pub fn get_scan_data(&self) -> Result<String, GS1EncoderError> {
         let ptr = unsafe { gs1_encoder_getScanData(self.ctx) };
         if ptr.is_null() {
-            return None;
+            return Err(GS1EncoderError::GS1ScanDataError(self.get_err_msg()));
         }
         let c_str: &CStr = unsafe { CStr::from_ptr(ptr) };
-        Some(c_str.to_str().unwrap().to_owned())
+        Ok(c_str.to_str().unwrap().to_owned())
     }
 
     pub fn set_scan_data(&mut self, value: &str) -> Result<(), GS1EncoderError> {
@@ -492,7 +492,12 @@ mod tests {
         assert!(!gs1encoder.get_permit_zero_suppressed_gtin_in_dl_uris());
         assert!(!gs1encoder.get_include_data_titles_in_hri());
         assert!(gs1encoder.get_ai_data_str().is_none());
-        assert!(gs1encoder.get_scan_data().is_none());
+        match gs1encoder.get_scan_data() {
+            Err(GS1EncoderError::GS1ScanDataError(msg)) => {
+                assert!(msg.contains("No symbology selected"))
+            }
+            other => panic!("expected GS1ScanDataError, got {:?}", other),
+        }
         assert!(gs1encoder.get_hri().is_empty());
         assert!(gs1encoder.get_dl_ignored_query_params().is_empty());
         assert_eq!(gs1encoder.get_err_markup(), "");
@@ -577,7 +582,12 @@ mod tests {
 
         gs1encoder.set_data_str("TESTING").unwrap();
         assert!(gs1encoder.get_ai_data_str().is_none());
-        assert!(gs1encoder.get_scan_data().is_none());
+        match gs1encoder.get_scan_data() {
+            Err(GS1EncoderError::GS1ScanDataError(msg)) => {
+                assert!(msg.contains("No symbology selected"))
+            }
+            other => panic!("expected GS1ScanDataError, got {:?}", other),
+        }
         assert!(gs1encoder.get_hri().is_empty());
         assert!(gs1encoder.get_dl_ignored_query_params().is_empty());
         let err = gs1encoder.get_dl_uri(None).unwrap_err();

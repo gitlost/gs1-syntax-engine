@@ -24,6 +24,7 @@
 from gs1encoders import (
     GS1Encoder,
     GS1EncoderDigitalLinkException,
+    GS1EncoderScanDataException,
     Symbology,
     Validation,
 )
@@ -71,10 +72,10 @@ def main():
         print(f"\nDL URI: Failed: {e}")
 
     # Scan data round-trip
-    if gs1encoder.scan_data:
+    try:
         print(f"Scan data: {gs1encoder.scan_data}")
-    else:
-        print("Scan data: None")
+    except GS1EncoderScanDataException as e:
+        print(f"Scan data: Failed: {e}")
 
     # DL ignored query params
     ignored = gs1encoder.dl_ignored_query_params

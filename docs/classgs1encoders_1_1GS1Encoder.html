@@ -751,8 +751,14 @@ type=cartoon
 </div><div class="memdoc">
 
 <p>Get the scan data string a reader would return for the current data and symbology. </p>
-<p>Returns the string that a scanner would produce when reading a symbol of the currently selected symbology containing the current input data. The output is prefixed with the appropriate AIM Symbology Identifier (e.g. <code>]Q3...</code> for GS1 QR Code, <code>]C1...</code> for GS1-128 with composite). Returns an empty string when no symbology is selected.</p>
-<dl class="section return"><dt>Returns</dt><dd>the scan data string, or an empty string when no symbology is selected. </dd></dl>
+<p>Returns the string that a scanner would produce when reading a symbol of the currently selected symbology containing the current input data. The output is prefixed with the appropriate AIM Symbology Identifier (e.g. <code>]Q3...</code> for GS1 QR Code, <code>]C1...</code> for GS1-128 with composite).</p>
+<dl class="section return"><dt>Returns</dt><dd>the scan data string. </dd></dl>
+<dl class="exception"><dt>Exceptions</dt><dd>
+  <table class="exception">
+    <tr><td class="paramname"><a class="el" href="classgs1encoders_1_1GS1EncoderScanDataException.html" title="Thrown to indicate an error processing barcode scan data.">GS1EncoderScanDataException</a></td><td>if no symbology is selected or the current data cannot be represented in the selected symbology. </td></tr>
+  </table>
+  </dd>
+</dl>
 <dl class="section see"><dt>See also</dt><dd><a class="el" href="classgs1encoders_1_1GS1Encoder.html#ab24d48d6c0ba43359f26cb1c18bfd85f" title="Process normalised scan data received from a barcode reader.">set_scan_data()</a> </dd>
 <dd>
 <a class="el" href="classgs1encoders_1_1GS1Encoder.html#ab157cad25ddf8222f9e8f65e07ec6c57" title="Get the current symbology type.">sym()</a> </dd></dl>

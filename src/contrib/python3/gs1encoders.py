@@ -368,11 +368,15 @@ class GS1Encoder:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
-    def scan_data(self) -> str | None:
-        """The scan data string, or None if no symbology is set."""
+    def scan_data(self) -> str:
+        """The scan data string.
+
+        Raises GS1EncoderScanDataException if no symbology is selected or
+        the current data cannot be represented in the selected symbology.
+        """
         ret: bytes | None = self.__api.gs1_encoder_getScanData(self.__ctx)
         if not ret:
-            return None
+            raise GS1EncoderScanDataException(self._get_err_msg())
         return ret.decode("utf-8")
 
     @scan_data.setter
