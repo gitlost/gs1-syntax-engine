@@ -215,8 +215,10 @@ class GS1Encoder:
 
     def __init__(self) -> None:
         """Create a new GS1 encoder instance."""
+        # A NULL return is a falsy pointer instance, never None
         self.__ctx = self.__api.gs1_encoder_init(None)
-        if self.__ctx is None:
+        if not self.__ctx:
+            self.__ctx = None
             raise GS1EncoderGeneralException("Failed to initialise the native library")
 
     def __del__(self) -> None:
@@ -233,9 +235,16 @@ class GS1Encoder:
 
     def free(self) -> None:
         """Release the native library context."""
-        if self.__ctx is not None:
+        if self.__ctx:
             self.__api.gs1_encoder_free(self.__ctx)
-            self.__ctx = None
+        self.__ctx = None
+
+    # A freed context must not reach the native library, whose entry points
+    # require a valid instance.
+    def __checked_ctx(self):
+        if not self.__ctx:
+            raise GS1EncoderGeneralException("GS1Encoder instance has been freed")
+        return self.__ctx
 
     @property
     def version(self) -> str:
@@ -247,68 +256,68 @@ class GS1Encoder:
     # message whenever an error is returned by the native library.  Therefore
     # direct access to the native error message is not necessary.
     def _get_err_msg(self) -> str:
-        ret: bytes = self.__api.gs1_encoder_getErrMsg(self.__ctx)
+        ret: bytes = self.__api.gs1_encoder_getErrMsg(self.__checked_ctx())
         return ret.decode("utf-8")
 
     @property
     def err_markup(self) -> str:
         """The current error markup from the library context."""
-        ret: bytes = self.__api.gs1_encoder_getErrMarkup(self.__ctx)
+        ret: bytes = self.__api.gs1_encoder_getErrMarkup(self.__checked_ctx())
         return ret.decode("utf-8")
 
     @property
     def sym(self) -> Symbology:
         """The currently selected symbology."""
-        return Symbology(self.__api.gs1_encoder_getSym(self.__ctx))
+        return Symbology(self.__api.gs1_encoder_getSym(self.__checked_ctx()))
 
     @sym.setter
     def sym(self, value: Symbology) -> None:
-        ret: bool = self.__api.gs1_encoder_setSym(self.__ctx, int(value))
+        ret: bool = self.__api.gs1_encoder_setSym(self.__checked_ctx(), int(value))
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
     def add_check_digit(self) -> bool:
         """Whether automatic check digit addition is enabled."""
-        return bool(self.__api.gs1_encoder_getAddCheckDigit(self.__ctx))
+        return bool(self.__api.gs1_encoder_getAddCheckDigit(self.__checked_ctx()))
 
     @add_check_digit.setter
     def add_check_digit(self, value: bool) -> None:
-        ret: bool = self.__api.gs1_encoder_setAddCheckDigit(self.__ctx, 1 if value else 0)
+        ret: bool = self.__api.gs1_encoder_setAddCheckDigit(self.__checked_ctx(), 1 if value else 0)
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
     def permit_unknown_ais(self) -> bool:
         """Whether unknown AIs are permitted."""
-        return bool(self.__api.gs1_encoder_getPermitUnknownAIs(self.__ctx))
+        return bool(self.__api.gs1_encoder_getPermitUnknownAIs(self.__checked_ctx()))
 
     @permit_unknown_ais.setter
     def permit_unknown_ais(self, value: bool) -> None:
-        ret: bool = self.__api.gs1_encoder_setPermitUnknownAIs(self.__ctx, 1 if value else 0)
+        ret: bool = self.__api.gs1_encoder_setPermitUnknownAIs(self.__checked_ctx(), 1 if value else 0)
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
     def permit_zero_suppressed_gtin_in_dl_uris(self) -> bool:
         """Whether zero-suppressed GTINs are permitted in DL URIs."""
-        return bool(self.__api.gs1_encoder_getPermitZeroSuppressedGTINinDLuris(self.__ctx))
+        return bool(self.__api.gs1_encoder_getPermitZeroSuppressedGTINinDLuris(self.__checked_ctx()))
 
     @permit_zero_suppressed_gtin_in_dl_uris.setter
     def permit_zero_suppressed_gtin_in_dl_uris(self, value: bool) -> None:
         val: int = 1 if value else 0
-        ret: bool = self.__api.gs1_encoder_setPermitZeroSuppressedGTINinDLuris(self.__ctx, val)
+        ret: bool = self.__api.gs1_encoder_setPermitZeroSuppressedGTINinDLuris(self.__checked_ctx(), val)
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     def get_validation_enabled(self, validation: Validation) -> bool:
         """Return whether the specified validation is enabled."""
-        return bool(self.__api.gs1_encoder_getValidationEnabled(self.__ctx, int(validation)))
+        return bool(self.__api.gs1_encoder_getValidationEnabled(self.__checked_ctx(), int(validation)))
 
     def set_validation_enabled(self, validation: Validation, enabled: bool) -> None:
         """Enable or disable the specified validation."""
         val: int = 1 if enabled else 0
-        ret: bool = self.__api.gs1_encoder_setValidationEnabled(self.__ctx, int(validation), val)
+        ret: bool = self.__api.gs1_encoder_setValidationEnabled(self.__checked_ctx(), int(validation), val)
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
@@ -333,37 +342,37 @@ class GS1Encoder:
     @property
     def include_data_titles_in_hri(self) -> bool:
         """Whether data titles are included in HRI output."""
-        return bool(self.__api.gs1_encoder_getIncludeDataTitlesInHRI(self.__ctx))
+        return bool(self.__api.gs1_encoder_getIncludeDataTitlesInHRI(self.__checked_ctx()))
 
     @include_data_titles_in_hri.setter
     def include_data_titles_in_hri(self, value: bool) -> None:
-        ret: bool = self.__api.gs1_encoder_setIncludeDataTitlesInHRI(self.__ctx, 1 if value else 0)
+        ret: bool = self.__api.gs1_encoder_setIncludeDataTitlesInHRI(self.__checked_ctx(), 1 if value else 0)
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
     def data_str(self) -> str:
         """The current raw data string."""
-        ret: bytes = self.__api.gs1_encoder_getDataStr(self.__ctx)
+        ret: bytes = self.__api.gs1_encoder_getDataStr(self.__checked_ctx())
         return ret.decode("utf-8")
 
     @data_str.setter
     def data_str(self, value: str) -> None:
-        ret: bool = self.__api.gs1_encoder_setDataStr(self.__ctx, value.encode("utf-8"))
+        ret: bool = self.__api.gs1_encoder_setDataStr(self.__checked_ctx(), value.encode("utf-8"))
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
     def ai_data_str(self) -> str | None:
         """The current AI data string, or None if unavailable."""
-        ret: bytes | None = self.__api.gs1_encoder_getAIdataStr(self.__ctx)
+        ret: bytes | None = self.__api.gs1_encoder_getAIdataStr(self.__checked_ctx())
         if not ret:
             return None
         return ret.decode("utf-8")
 
     @ai_data_str.setter
     def ai_data_str(self, value: str) -> None:
-        ret: bool = self.__api.gs1_encoder_setAIdataStr(self.__ctx, value.encode("utf-8"))
+        ret: bool = self.__api.gs1_encoder_setAIdataStr(self.__checked_ctx(), value.encode("utf-8"))
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
@@ -374,14 +383,14 @@ class GS1Encoder:
         Raises GS1EncoderScanDataException if no symbology is selected or
         the current data cannot be represented in the selected symbology.
         """
-        ret: bytes | None = self.__api.gs1_encoder_getScanData(self.__ctx)
+        ret: bytes | None = self.__api.gs1_encoder_getScanData(self.__checked_ctx())
         if not ret:
             raise GS1EncoderScanDataException(self._get_err_msg())
         return ret.decode("utf-8")
 
     @scan_data.setter
     def scan_data(self, value: str) -> None:
-        ret: bool = self.__api.gs1_encoder_setScanData(self.__ctx, value.encode("utf-8"))
+        ret: bool = self.__api.gs1_encoder_setScanData(self.__checked_ctx(), value.encode("utf-8"))
         if not ret:
             raise GS1EncoderScanDataException(self._get_err_msg())
 
@@ -393,7 +402,7 @@ class GS1Encoder:
                 be generated from the current data.
         """
         c_stem: bytes | None = stem.encode("utf-8") if stem else None
-        ret: bytes | None = self.__api.gs1_encoder_getDLuri(self.__ctx, c_stem)
+        ret: bytes | None = self.__api.gs1_encoder_getDLuri(self.__checked_ctx(), c_stem)
         if not ret:
             raise GS1EncoderDigitalLinkException(self._get_err_msg())
         return ret.decode("utf-8")
@@ -402,7 +411,7 @@ class GS1Encoder:
     def dl_ignored_query_params(self) -> list[str]:
         """Non-AI query parameters from a GS1 Digital Link URI."""
         ptr = ctypes.pointer(ctypes.c_char_p())
-        size: int = self.__api.gs1_encoder_getDLignoredQueryParams(self.__ctx, ctypes.byref(ptr))
+        size: int = self.__api.gs1_encoder_getDLignoredQueryParams(self.__checked_ctx(), ctypes.byref(ptr))
         params: list[str] = []
         for i in range(size):
             params.append(ptr[i].decode("utf-8"))
@@ -412,7 +421,7 @@ class GS1Encoder:
     def hri(self) -> list[str]:
         """The Human Readable Interpretation strings."""
         ptr = ctypes.pointer(ctypes.c_char_p())
-        size: int = self.__api.gs1_encoder_getHRI(self.__ctx, ctypes.byref(ptr))
+        size: int = self.__api.gs1_encoder_getHRI(self.__checked_ctx(), ctypes.byref(ptr))
         hri: list[str] = []
         for i in range(size):
             hri.append(ptr[i].decode("utf-8"))
