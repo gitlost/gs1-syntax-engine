@@ -313,4 +313,25 @@ final class GS1EncoderTests: XCTestCase {
         }
     }
 
+    // Use of a freed instance is a precondition failure, which XCTest cannot
+    // observe in-process; this covers the reachable lifecycle behaviour.
+    func testFreeIsIdempotent() throws {
+        let gs1encoder = try GS1Encoder()
+        gs1encoder.free()
+        gs1encoder.free()
+        XCTAssertFalse(gs1encoder.getVersion().isEmpty)
+    }
+
+    // A NUL would silently truncate the C string, accepting corrupted input
+    // as different valid data.
+    func testNulByteInInputIsRejected() throws {
+        let gs1encoder = try GS1Encoder()
+        XCTAssertThrowsError(try gs1encoder.setDataStr("bad\0data"))
+        XCTAssertThrowsError(try gs1encoder.setAIdataStr("(99)bad\0data"))
+        XCTAssertThrowsError(try gs1encoder.setScanData("]Q1bad\0data"))
+        try gs1encoder.setAIdataStr("(01)12312312312319")
+        XCTAssertThrowsError(try gs1encoder.getDLuri("https://bad\0stem"))
+        gs1encoder.free()
+    }
+
 }

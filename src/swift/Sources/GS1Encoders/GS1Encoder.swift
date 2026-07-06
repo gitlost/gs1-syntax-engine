@@ -126,7 +126,7 @@ public class GS1Encoder {
     // an error is returned by the native library. Therefore direct access to the native
     // error message is not necessary.
     private func getErrMsg() -> String {
-        return String(cString: gs1_encoder_getErrMsg(ctx))
+        return String(cString: gs1_encoder_getErrMsg(checkedCtx()))
     }
 
 
@@ -183,7 +183,9 @@ public class GS1Encoder {
     /// Release library resources.
     ///
     /// This method will release the resources allocated by the native library.
-    /// After calling this method, the GS1Encoder instance should not be used.
+    /// Freeing is idempotent. Any other use of a freed instance stops the
+    /// program with a precondition failure rather than passing a stale
+    /// context to the native library.
     public func free() {
         if ctx != nil {
             gs1_encoder_free(ctx)
@@ -193,6 +195,15 @@ public class GS1Encoder {
 
     deinit {
         free()
+    }
+
+    /// A freed context must not reach the native library, whose entry points
+    /// require a valid instance.
+    private func checkedCtx() -> OpaquePointer {
+        guard let ctx = ctx else {
+            preconditionFailure("GS1Encoder instance has been freed")
+        }
+        return ctx
     }
 
     /// Get the version string of the library.
@@ -214,7 +225,7 @@ public class GS1Encoder {
     /// - SeeAlso: `Symbology`
     /// - SeeAlso: `setScanData(_:)`
     public func getSym() -> Symbology {
-        return Symbology(rawValue: gs1_encoder_getSym(ctx).rawValue) ?? Symbology.NONE
+        return Symbology(rawValue: gs1_encoder_getSym(checkedCtx()).rawValue) ?? Symbology.NONE
     }
 
     /// Set the symbology type.
@@ -226,7 +237,7 @@ public class GS1Encoder {
     /// - SeeAlso: `getSym()`
     /// - SeeAlso: `Symbology`
     public func setSym(_ value: Symbology) throws {
-        if !gs1_encoder_setSym(ctx, gs1_encoder_symbologies(value.rawValue)) {
+        if !gs1_encoder_setSym(checkedCtx(), gs1_encoder_symbologies(value.rawValue)) {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -236,7 +247,7 @@ public class GS1Encoder {
     /// - Returns: `true` if check digits will be generated automatically; `false` if the data must include a valid check digit
     /// - SeeAlso: `setAddCheckDigit(_:)`
     public func getAddCheckDigit() -> Bool {
-        return gs1_encoder_getAddCheckDigit(ctx)
+        return gs1_encoder_getAddCheckDigit(checkedCtx())
     }
 
     /// Enable or disable "add check digit" mode for EAN/UPC and GS1 DataBar symbols.
@@ -252,7 +263,7 @@ public class GS1Encoder {
     /// - Throws: `GS1EncoderError.parameterError` if the value is invalid
     /// - SeeAlso: `getAddCheckDigit()`
     public func setAddCheckDigit(_ value: Bool) throws {
-        if !gs1_encoder_setAddCheckDigit(ctx, value) {
+        if !gs1_encoder_setAddCheckDigit(checkedCtx(), value) {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -263,7 +274,7 @@ public class GS1Encoder {
     ///
     /// - Returns: The status of the "include data titles in HRI" flag
     public func getIncludeDataTitlesInHRI() -> Bool {
-        return gs1_encoder_getIncludeDataTitlesInHRI(ctx)
+        return gs1_encoder_getIncludeDataTitlesInHRI(checkedCtx())
     }
 
     /// Set the "include data titles in HRI" flag.
@@ -276,7 +287,7 @@ public class GS1Encoder {
     /// - Parameter value: `true` to include data titles in HRI; `false` otherwise
     /// - Throws: `GS1EncoderError.parameterError` if an error occurs
     public func setIncludeDataTitlesInHRI(_ value: Bool) throws {
-        if !gs1_encoder_setIncludeDataTitlesInHRI(ctx, value) {
+        if !gs1_encoder_setIncludeDataTitlesInHRI(checkedCtx(), value) {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -287,7 +298,7 @@ public class GS1Encoder {
     ///
     /// - Returns: The status of the "permit unknown AIs" mode
     public func getPermitUnknownAIs() -> Bool {
-        return gs1_encoder_getPermitUnknownAIs(ctx)
+        return gs1_encoder_getPermitUnknownAIs(checkedCtx())
     }
 
     /// Set the "permit unknown AIs" mode.
@@ -300,7 +311,7 @@ public class GS1Encoder {
     /// - Parameter value: `true` to permit unknown AIs; `false` to reject them
     /// - Throws: `GS1EncoderError.parameterError` if an error occurs
     public func setPermitUnknownAIs(_ value: Bool) throws {
-        if !gs1_encoder_setPermitUnknownAIs(ctx, value) {
+        if !gs1_encoder_setPermitUnknownAIs(checkedCtx(), value) {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -311,7 +322,7 @@ public class GS1Encoder {
     ///
     /// - Returns: The status of the "permit zero-suppressed GTIN in GS1 DL URIs" mode
     public func getPermitZeroSuppressedGTINinDLuris() -> Bool {
-        return gs1_encoder_getPermitZeroSuppressedGTINinDLuris(ctx)
+        return gs1_encoder_getPermitZeroSuppressedGTINinDLuris(checkedCtx())
     }
 
     /// Set the status of the "permit zero-suppressed GTIN in GS1 DL URIs" mode.
@@ -325,7 +336,7 @@ public class GS1Encoder {
     /// - Parameter value: `true` to permit zero-suppressed GTINs; `false` to require canonical form
     /// - Throws: `GS1EncoderError.parameterError` if an error occurs
     public func setPermitZeroSuppressedGTINinDLuris(_ value: Bool) throws {
-        if !gs1_encoder_setPermitZeroSuppressedGTINinDLuris(ctx, value) {
+        if !gs1_encoder_setPermitZeroSuppressedGTINinDLuris(checkedCtx(), value) {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -337,7 +348,7 @@ public class GS1Encoder {
     /// - SeeAlso: `setValidationEnabled(validation:enabled:)`
     /// - SeeAlso: `Validation`
     public func getValidationEnabled(_ validation: Validation) -> Bool {
-        return gs1_encoder_getValidationEnabled(ctx, gs1_encoder_validations(validation.rawValue))
+        return gs1_encoder_getValidationEnabled(checkedCtx(), gs1_encoder_validations(validation.rawValue))
     }
 
     /// Enable or disable a specific validation procedure.
@@ -352,7 +363,7 @@ public class GS1Encoder {
     /// - SeeAlso: `getValidationEnabled(_:)`
     /// - SeeAlso: `Validation`
     public func setValidationEnabled(validation: Validation, enabled: Bool) throws {
-        if !gs1_encoder_setValidationEnabled(ctx, gs1_encoder_validations(validation.rawValue), enabled) {
+        if !gs1_encoder_setValidationEnabled(checkedCtx(), gs1_encoder_validations(validation.rawValue), enabled) {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -386,7 +397,7 @@ public class GS1Encoder {
     /// - Returns: The barcode message data
     /// - SeeAlso: `setDataStr(_:)`
     public func getDataStr() -> String {
-        return String(cString: gs1_encoder_getDataStr(ctx))
+        return String(cString: gs1_encoder_getDataStr(checkedCtx()))
     }
 
     /// Set the raw barcode message data.
@@ -399,7 +410,13 @@ public class GS1Encoder {
     /// - Throws: `GS1EncoderError.parameterError` if the data is invalid
     /// - SeeAlso: `getDataStr()`
     public func setDataStr(_ value: String) throws {
-        if !gs1_encoder_setDataStr(ctx, UnsafeMutablePointer<CChar>(mutating: (value as NSString).utf8String)) {
+        guard !value.contains("\0") else {
+            throw GS1EncoderError.parameterError(msg: "Input must not contain a NUL character")
+        }
+        let ret = value.withCString { cValue in
+            gs1_encoder_setDataStr(checkedCtx(), cValue)
+        }
+        if !ret {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -412,7 +429,7 @@ public class GS1Encoder {
     /// - Returns: The bracketed AI element string, or `nil` if no AI data is available
     /// - SeeAlso: `setAIdataStr(_:)`
     public func getAIdataStr() -> String? {
-        let cstr = gs1_encoder_getAIdataStr(ctx)
+        let cstr = gs1_encoder_getAIdataStr(checkedCtx())
         if cstr == nil {
             return nil
         }
@@ -428,7 +445,13 @@ public class GS1Encoder {
     /// - Throws: `GS1EncoderError.parameterError` if the data is invalid
     /// - SeeAlso: `getAIdataStr()`
     public func setAIdataStr(_ value: String) throws {
-        if !gs1_encoder_setAIdataStr(ctx, UnsafeMutablePointer<CChar>(mutating: (value as NSString).utf8String)) {
+        guard !value.contains("\0") else {
+            throw GS1EncoderError.parameterError(msg: "Input must not contain a NUL character")
+        }
+        let ret = value.withCString { cValue in
+            gs1_encoder_setAIdataStr(checkedCtx(), cValue)
+        }
+        if !ret {
             throw GS1EncoderError.parameterError(msg: self.getErrMsg())
         }
     }
@@ -443,7 +466,7 @@ public class GS1Encoder {
     ///   current data cannot be represented in the selected symbology
     /// - SeeAlso: `setScanData(_:)`
     public func getScanData() throws -> String {
-        guard let ptr = gs1_encoder_getScanData(ctx) else {
+        guard let ptr = gs1_encoder_getScanData(checkedCtx()) else {
             throw GS1EncoderError.scanDataError(msg: self.getErrMsg())
         }
         return String(cString: ptr)
@@ -462,7 +485,13 @@ public class GS1Encoder {
     /// - SeeAlso: `getScanData()`
     /// - SeeAlso: `getSym()`
     public func setScanData(_ value: String) throws {
-        if !gs1_encoder_setScanData(ctx, UnsafeMutablePointer<CChar>(mutating: (value as NSString).utf8String)) {
+        guard !value.contains("\0") else {
+            throw GS1EncoderError.scanDataError(msg: "Input must not contain a NUL character")
+        }
+        let ret = value.withCString { cValue in
+            gs1_encoder_setScanData(checkedCtx(), cValue)
+        }
+        if !ret {
             throw GS1EncoderError.scanDataError(msg: self.getErrMsg())
         }
     }
@@ -476,7 +505,7 @@ public class GS1Encoder {
     ///
     /// - Returns: The error markup showing the location of the error in the input data
     public func getErrMarkup() -> String {
-        return String(cString: gs1_encoder_getErrMarkup(ctx))
+        return String(cString: gs1_encoder_getErrMarkup(checkedCtx()))
     }
 
     /// Get a GS1 Digital Link URI that represents the AI-based input data.
@@ -489,16 +518,21 @@ public class GS1Encoder {
     /// - Throws: `GS1EncoderError.digitalLinkError` if the Digital Link URI cannot be generated
     /// - Note: AI data must be set using `setAIdataStr(_:)`, `setDataStr(_:)` or `setScanData(_:)` before calling this method
     public func getDLuri(_ stem: String? = nil) throws -> String {
-        var cstr: UnsafeMutablePointer<CChar>?
+        let cstr: UnsafeMutablePointer<CChar>?
         if let ustem = stem {
-            cstr = gs1_encoder_getDLuri(ctx, UnsafeMutablePointer<CChar>(mutating: (ustem as NSString).utf8String))
+            guard !ustem.contains("\0") else {
+                throw GS1EncoderError.digitalLinkError(msg: "Stem must not contain a NUL character")
+            }
+            cstr = ustem.withCString { cStem in
+                gs1_encoder_getDLuri(checkedCtx(), cStem)
+            }
         } else {
-            cstr = gs1_encoder_getDLuri(ctx, nil)
+            cstr = gs1_encoder_getDLuri(checkedCtx(), nil)
         }
-        if cstr == nil {
+        guard let cstr = cstr else {
             throw GS1EncoderError.digitalLinkError(msg: self.getErrMsg())
         }
-        return String(cString: cstr!)
+        return String(cString: cstr)
     }
 
     /// Get the Human-Readable Interpretation (HRI) text for the current AI data as an array of strings.
@@ -515,7 +549,7 @@ public class GS1Encoder {
             hri.deinitialize(count: 1)
             hri.deallocate()
         }
-        let numHRI = Int(gs1_encoder_getHRI(ctx, hri))
+        let numHRI = Int(gs1_encoder_getHRI(checkedCtx(), hri))
         var out = [String]()
         for (_, value) in UnsafeBufferPointer(start: hri.pointee, count: numHRI).enumerated() {
             out.append(String(cString: value!))
@@ -537,7 +571,7 @@ public class GS1Encoder {
             qp.deinitialize(count: 1)
             qp.deallocate()
         }
-        let numQP = Int(gs1_encoder_getDLignoredQueryParams(ctx, qp))
+        let numQP = Int(gs1_encoder_getDLignoredQueryParams(checkedCtx(), qp))
         var out = [String]()
         for (_, value) in UnsafeBufferPointer(start: qp.pointee, count: numQP).enumerated() {
             out.append(String(cString: value!))
