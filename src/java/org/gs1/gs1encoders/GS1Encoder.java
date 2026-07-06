@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 
 /**
  * Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.
@@ -666,11 +667,13 @@ public class GS1Encoder implements AutoCloseable {
      *
      * @param value the raw barcode data to be set
      * @throws GS1EncoderParameterException if the provided data is invalid
+     * @throws NullPointerException if the provided data is null
      * @see #getDataStr()
      * @see #setAIdataStr(String)
      * @see #getErrMarkup()
      */
     public void setDataStr(String value) throws GS1EncoderParameterException {
+        Objects.requireNonNull(value, "value must not be null");
         if (!gs1encoderSetDataStrJNI(ctx, value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
@@ -713,8 +716,10 @@ public class GS1Encoder implements AutoCloseable {
      *
      * @param value the barcode data in GS1 AI syntax
      * @throws GS1EncoderParameterException if the input is invalid
+     * @throws NullPointerException if the provided data is null
      */
     public void setAIdataStr(String value) throws GS1EncoderParameterException {
+        Objects.requireNonNull(value, "value must not be null");
         if (!gs1encoderSetAIdataStrJNI(ctx, value))
             throw new GS1EncoderParameterException(this.getErrMsg());
     }
@@ -765,8 +770,10 @@ public class GS1Encoder implements AutoCloseable {
      *
      * @param value the scan data string as read by a reader with AIM symbology identifiers enabled
      * @throws GS1EncoderScanDataException if the scan data is invalid
+     * @throws NullPointerException if the provided data is null
      */
     public void setScanData(String value) throws GS1EncoderScanDataException {
+        Objects.requireNonNull(value, "value must not be null");
         if (!gs1encoderSetScanDataJNI(ctx, value))
             throw new GS1EncoderScanDataException(this.getErrMsg());
     }

@@ -190,6 +190,17 @@ public class GS1EncoderTest {
     }
 
     @Test
+    public void testNullDataSetterArguments() throws Exception {
+        GS1Encoder gs1encoder = new GS1Encoder();
+
+        assertThrows(NullPointerException.class, () -> gs1encoder.setDataStr(null));
+        assertThrows(NullPointerException.class, () -> gs1encoder.setAIdataStr(null));
+        assertThrows(NullPointerException.class, () -> gs1encoder.setScanData(null));
+
+        gs1encoder.free();
+    }
+
+    @Test
     public void testNonAIdata() throws Exception {
         GS1Encoder gs1encoder = new GS1Encoder();
 
