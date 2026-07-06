@@ -96,7 +96,11 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">GS1Encoder</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>
 implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/AutoCloseable.html" title="class or interface in java.lang" class="external-link">AutoCloseable</a></span></div>
-<div class="block">Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.</div>
+<div class="block">Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.
+ <p>
+ The library is thread-safe provided that each thread operates on its own
+ GS1Encoder instance. This applies also to the getters, which mutate
+ internal buffers of the native context.</div>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -369,7 +373,9 @@ implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">close</span>()</div>
 <div class="block">Releases the resources associated with this encoder instance.
  <p>
- This method is called automatically when used with try-with-resources.</div>
+ This method is called automatically when used with try-with-resources.
+ Closing is idempotent; any other method called on a closed instance
+ throws <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/IllegalStateException.html" title="class or interface in java.lang" class="external-link"><code>IllegalStateException</code></a>.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/AutoCloseable.html#close()" title="class or interface in java.lang" class="external-link">close</a></code>&nbsp;in interface&nbsp;<code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/AutoCloseable.html" title="class or interface in java.lang" class="external-link">AutoCloseable</a></code></dd>
@@ -746,6 +752,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <dd><code>value</code> - the raw barcode data to be set</dd>
 <dt>Throws:</dt>
 <dd><code><a href="GS1EncoderParameterException.html" title="class in org.gs1.gs1encoders">GS1EncoderParameterException</a></code> - if the provided data is invalid</dd>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/NullPointerException.html" title="class or interface in java.lang" class="external-link">NullPointerException</a></code> - if the provided data is null</dd>
 <dt>See Also:</dt>
 <dd>
 <ul class="tag-list">
@@ -803,6 +810,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <dd><code>value</code> - the barcode data in GS1 AI syntax</dd>
 <dt>Throws:</dt>
 <dd><code><a href="GS1EncoderParameterException.html" title="class in org.gs1.gs1encoders">GS1EncoderParameterException</a></code> - if the input is invalid</dd>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/NullPointerException.html" title="class or interface in java.lang" class="external-link">NullPointerException</a></code> - if the provided data is null</dd>
 </dl>
 </section>
 </li>
@@ -859,6 +867,7 @@ implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <dd><code>value</code> - the scan data string as read by a reader with AIM symbology identifiers enabled</dd>
 <dt>Throws:</dt>
 <dd><code><a href="GS1EncoderScanDataException.html" title="class in org.gs1.gs1encoders">GS1EncoderScanDataException</a></code> - if the scan data is invalid</dd>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/NullPointerException.html" title="class or interface in java.lang" class="external-link">NullPointerException</a></code> - if the provided data is null</dd>
 </dl>
 </section>
 </li>
