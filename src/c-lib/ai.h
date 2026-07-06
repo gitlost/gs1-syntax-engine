@@ -175,6 +175,7 @@ void test_ai_existsInAIdata(void);
 void test_ai_checkAIlengthByPrefix(void);
 void test_ai_AItableVsPrefixLength(void);
 void test_ai_AItableVsIsFNC1required(void);
+void test_ai_AItableVsLoaderCaps(void);
 void test_ai_parseAIdata(void);
 void test_ai_linters(void);
 void test_ai_errMarkup(void);

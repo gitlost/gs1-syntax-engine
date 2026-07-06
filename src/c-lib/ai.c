@@ -232,11 +232,11 @@ __ATTR_PURE bool gs1_aiPrefixHasDerivedLength(const char* const ai) {
  *
  */
 static const struct aiEntry unknownAI =
-	AI_ENTRY( ""    , DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
+	AI_ENTRY( ""    , DO_FNC1, XX_DATA_ATTR, X,1,MAX_AI_VALUE_LEN,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI3 =
-	AI_ENTRY( "XXX" , DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
+	AI_ENTRY( "XXX" , DO_FNC1, XX_DATA_ATTR, X,1,MAX_AI_VALUE_LEN,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI4 =
-	AI_ENTRY( "XXXX", DO_FNC1, XX_DATA_ATTR, X,1,90,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
+	AI_ENTRY( "XXXX", DO_FNC1, XX_DATA_ATTR, X,1,MAX_AI_VALUE_LEN,MAN,_,_,_,  __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI3fixed13 =
 	AI_ENTRY( "XXX" , NO_FNC1, XX_DATA_ATTR, X,13,13,MAN,_,_,_, __, __, __, __, "", "UNKNOWN" );
 static const struct aiEntry unknownAI4fixed6 =
@@ -1328,6 +1328,29 @@ void test_ai_AItableVsIsFNC1required(void) {
 		TEST_CASE(entry->ai);
 		TEST_CHECK(entry->fnc1 == (valLengthByPrefix(entry->ai) == 0));
 		TEST_MSG("Prefix list: %d; AI table: %d", (valLengthByPrefix(entry->ai) == 0), entry->fnc1);
+	}
+
+	gs1_encoder_free(ctx);
+
+}
+
+// The embedded AI table bypasses the Syntax Dictionary loader's per-entry
+// caps on value, title and attrs lengths, which bound fixed-size buffers
+void test_ai_AItableVsLoaderCaps(void) {
+	const struct aiEntry *entry;
+
+	gs1_encoder* ctx;
+	TEST_ASSERT((ctx = gs1_encoder_unit_test_init()) != NULL);
+	assert(ctx);
+
+	for (entry = ctx->aiTable; *entry->ai; entry++) {
+		TEST_CASE(entry->ai);
+		TEST_CHECK(aiEntryMaxLength(entry) <= MAX_AI_VALUE_LEN);
+		TEST_MSG("Max value length %zu exceeds MAX_AI_VALUE_LEN", aiEntryMaxLength(entry));
+		TEST_CHECK(strlen(entry->title) <= MAX_AI_TITLE_LEN);
+		TEST_MSG("Title length %zu exceeds MAX_AI_TITLE_LEN", strlen(entry->title));
+		TEST_CHECK(strlen(entry->attrs) <= MAX_AI_ATTR_LEN);
+		TEST_MSG("Attrs length %zu exceeds MAX_AI_ATTR_LEN", strlen(entry->attrs));
 	}
 
 	gs1_encoder_free(ctx);

@@ -36,6 +36,9 @@
 #define AI_TABLE_CAPACITY 750
 #define MAX_SD_ENTRY_LEN 150
 
+// Table capacity and entry offsets are passed around as uint16_t
+GS1_ENCODERS_STATIC_ASSERT(AI_TABLE_CAPACITY <= UINT16_MAX);
+
 
 #define error_v(...) do {			\
 	SET_ERR_V(__VA_ARGS__);			\

@@ -111,6 +111,7 @@ TEST_LIST = {
     { "ai_test_ai_checkAIlengthByPrefix", test_ai_checkAIlengthByPrefix },
     { "ai_AItableVsPrefixLength", test_ai_AItableVsPrefixLength },
     { "ai_AItableVsIsFNC1required", test_ai_AItableVsIsFNC1required },
+    { "ai_AItableVsLoaderCaps", test_ai_AItableVsLoaderCaps },
     { "ai_gs1_parseAIdata", test_ai_parseAIdata },
     { "ai_linters", test_ai_linters },
     { "ai_errMarkup", test_ai_errMarkup },

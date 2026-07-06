@@ -45,6 +45,13 @@
 // Bounds the 2^n key-qualifier combinations; real dictionary uses at most 3
 #define MAX_DL_KEY_QUALIFIERS 5
 
+// The key-qualifier expansion emits 2^n entries, counted in an int
+GS1_ENCODERS_STATIC_ASSERT((1ULL << MAX_DL_KEY_QUALIFIERS) <= INT_MAX);
+
+// Each AI's DL path position is held in uint8_t, with UINT8_MAX reserved as
+// the data-attribute sentinel
+GS1_ENCODERS_STATIC_ASSERT(MAX_AIS <= DL_PATH_ORDER_ATTRIBUTE);
+
 
 /*
  *  Set of characters that are permissible in URIs, including percent
@@ -87,7 +94,7 @@ static inline __ATTR_CONST bool isBadDomainChar(char c) {
  */
 struct alpha_ai_s {
 	char alpha[6];
-	char ai[5];
+	char ai[MAX_AI_LEN+1];
 };
 
 static const struct alpha_ai_s alpha_ai_map[] = {

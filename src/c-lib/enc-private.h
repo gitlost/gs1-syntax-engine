@@ -30,7 +30,6 @@
 
 
 // Implementation limits that can be changed
-#define MAX_FNAME	120	// Maximum filename
 #define MAX_DATA	8191	// Maximum input buffer size
 
 
@@ -137,6 +136,7 @@
 #define GS1_SEARCH_NOT_FOUND (-1)
 
 #define SIZEOF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
+#define SIZEOF_FIELD(t, f) sizeof(((t *)0)->f)
 
 // Portable compile-time assertion
 #define GS1_ENCODERS_STATIC_ASSERT_(cond, id)	typedef char gs1_encoders_static_assert_##id[(cond) ? 1 : -1]
@@ -320,8 +320,29 @@ struct gs1_encoder {
  *    getAIdataStr: "(AI)" then the value with each byte escaped ("(" -> "\(")
  *
  */
-GS1_ENCODERS_STATIC_ASSERT(sizeof(((struct gs1_encoder *)0)->outStr) / MAX_AIS >= MAX_AI_TITLE_LEN + MAX_AI_LEN + MAX_AI_VALUE_LEN + 5);
-GS1_ENCODERS_STATIC_ASSERT(sizeof(((struct gs1_encoder *)0)->outStr) / MAX_AIS >= MAX_AI_LEN + 2*MAX_AI_VALUE_LEN + 2);
+GS1_ENCODERS_STATIC_ASSERT(SIZEOF_FIELD(struct gs1_encoder, outStr) / MAX_AIS >= MAX_AI_TITLE_LEN + MAX_AI_LEN + MAX_AI_VALUE_LEN + 5);
+GS1_ENCODERS_STATIC_ASSERT(SIZEOF_FIELD(struct gs1_encoder, outStr) / MAX_AIS >= MAX_AI_LEN + 2*MAX_AI_VALUE_LEN + 2);
+
+// Linter failure markup is "(AI)before|error|after" over a single AI value,
+// whose length the loader caps at MAX_AI_VALUE_LEN
+GS1_ENCODERS_STATIC_ASSERT(SIZEOF_FIELD(struct gs1_encoder, linterErrMarkup) >= MAX_AI_LEN + MAX_AI_VALUE_LEN + 5);
+
+// getAIdataStr rendering of dataStr may escape ("(" -> "\(") every byte
+GS1_ENCODERS_STATIC_ASSERT(SIZEOF_FIELD(struct gs1_encoder, outStr) >= 2 * MAX_DATA + 1);
+
+// AI lengths, including the length-by-prefix table values, are held in uint8_t
+GS1_ENCODERS_STATIC_ASSERT(MAX_AI_LEN <= UINT8_MAX);
+
+// A single aiComponent may span a whole AI value (e.g. the unknown-AI
+// entries); aiComponent.max is uint8_t
+GS1_ENCODERS_STATIC_ASSERT(MAX_AI_VALUE_LEN <= UINT8_MAX);
+
+// aiValue.vallen is uint16_t and DL ignored query params are bounded only by
+// the input size
+GS1_ENCODERS_STATIC_ASSERT(MAX_DATA <= UINT16_MAX);
+
+// AI lookup and validation machinery indexes by the first two digits of an AI
+GS1_ENCODERS_STATIC_ASSERT(MIN_AI_LEN >= 2);
 
 
 // The guarded buffers of a gs1_encoder, declared once; passed to
