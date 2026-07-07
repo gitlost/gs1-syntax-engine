@@ -25,6 +25,11 @@ namespace GS1.Encoders
     /// <summary>
     /// Main class for processing GS1 barcode data, including validation, format conversion, and generation of outputs such as GS1 Digital Link URIs and Human-Readable Interpretation text.
     /// </summary>
+    /// <remarks>
+    /// The library is thread-safe provided that each thread operates on its
+    /// own GS1Encoder instance. This applies also to the property getters,
+    /// which mutate internal buffers of the native context.
+    /// </remarks>
     public class GS1Encoder : IDisposable
     {
 
@@ -128,11 +133,29 @@ namespace GS1.Encoders
         private const String gs1_dll = "gs1encoders.dll";
 
         /// <summary>
-        /// An opaque pointer used by the native code to represent an
+        /// An opaque handle used by the native code to represent an
         /// "instance" of the library. It is hidden behind the object
         /// interface that is provided to users of this wrapper.
         /// </summary>
-        private IntPtr ctx;
+        /// <remarks>
+        /// P/Invoke marshalling of a SafeHandle keeps the native context
+        /// alive for the duration of each native call and throws
+        /// ObjectDisposedException once the handle has been closed.
+        /// </remarks>
+        private readonly GS1EncoderHandle ctx;
+
+        private sealed class GS1EncoderHandle : SafeHandle
+        {
+            public GS1EncoderHandle() : base(IntPtr.Zero, true) { }
+
+            public override bool IsInvalid => handle == IntPtr.Zero;
+
+            protected override bool ReleaseHandle()
+            {
+                gs1_encoder_free(handle);
+                return true;
+            }
+        }
 
         /// <summary>
         /// Initialisation options for the GS1Encoder.
@@ -179,93 +202,93 @@ namespace GS1.Encoders
          *
          */
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_init_ex", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_init_ex(IntPtr mem, ref NativeInitOpts opts);
+        private static extern GS1EncoderHandle gs1_encoder_init_ex(IntPtr mem, ref NativeInitOpts opts);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getVersion", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr gs1_encoder_getVersion();
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getErrMsg", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getErrMsg(IntPtr ctx);
+        private static extern IntPtr gs1_encoder_getErrMsg(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getErrMarkup", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getErrMarkup(IntPtr ctx);
+        private static extern IntPtr gs1_encoder_getErrMarkup(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getSym", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int gs1_encoder_getSym(IntPtr ctx);
+        private static extern int gs1_encoder_getSym(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setSym", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setSym(IntPtr ctx, int sym);
+        private static extern bool gs1_encoder_setSym(GS1EncoderHandle ctx, int sym);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getAddCheckDigit", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_getAddCheckDigit(IntPtr ctx);
+        private static extern bool gs1_encoder_getAddCheckDigit(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setAddCheckDigit", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setAddCheckDigit(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool addCheckDigit);
+        private static extern bool gs1_encoder_setAddCheckDigit(GS1EncoderHandle ctx, [MarshalAs(UnmanagedType.U1)] bool addCheckDigit);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getIncludeDataTitlesInHRI", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_getIncludeDataTitlesInHRI(IntPtr ctx);
+        private static extern bool gs1_encoder_getIncludeDataTitlesInHRI(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setIncludeDataTitlesInHRI", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setIncludeDataTitlesInHRI(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool includeDataTitlesInHRI);
+        private static extern bool gs1_encoder_setIncludeDataTitlesInHRI(GS1EncoderHandle ctx, [MarshalAs(UnmanagedType.U1)] bool includeDataTitlesInHRI);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getPermitUnknownAIs", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_getPermitUnknownAIs(IntPtr ctx);
+        private static extern bool gs1_encoder_getPermitUnknownAIs(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setPermitUnknownAIs", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setPermitUnknownAIs(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool permitUnknownAIs);
+        private static extern bool gs1_encoder_setPermitUnknownAIs(GS1EncoderHandle ctx, [MarshalAs(UnmanagedType.U1)] bool permitUnknownAIs);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getPermitZeroSuppressedGTINinDLuris", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_getPermitZeroSuppressedGTINinDLuris(IntPtr ctx);
+        private static extern bool gs1_encoder_getPermitZeroSuppressedGTINinDLuris(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setPermitZeroSuppressedGTINinDLuris", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setPermitZeroSuppressedGTINinDLuris(IntPtr ctx, [MarshalAs(UnmanagedType.U1)] bool permitZeroSuppressedGTINinDLuris);
+        private static extern bool gs1_encoder_setPermitZeroSuppressedGTINinDLuris(GS1EncoderHandle ctx, [MarshalAs(UnmanagedType.U1)] bool permitZeroSuppressedGTINinDLuris);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getValidationEnabled", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_getValidationEnabled(IntPtr ctx, int validation);
+        private static extern bool gs1_encoder_getValidationEnabled(GS1EncoderHandle ctx, int validation);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setValidationEnabled", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setValidationEnabled(IntPtr ctx, int validation, [MarshalAs(UnmanagedType.U1)] bool enabled);
+        private static extern bool gs1_encoder_setValidationEnabled(GS1EncoderHandle ctx, int validation, [MarshalAs(UnmanagedType.U1)] bool enabled);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getDataStr", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getDataStr(IntPtr ctx);
+        private static extern IntPtr gs1_encoder_getDataStr(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setDataStr", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setDataStr(IntPtr ctx, string dataStr);
+        private static extern bool gs1_encoder_setDataStr(GS1EncoderHandle ctx, string dataStr);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setAIdataStr", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setAIdataStr(IntPtr ctx, string aiData);
+        private static extern bool gs1_encoder_setAIdataStr(GS1EncoderHandle ctx, string aiData);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getAIdataStr", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getAIdataStr(IntPtr ctx);
+        private static extern IntPtr gs1_encoder_getAIdataStr(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getScanData", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getScanData(IntPtr ctx);
+        private static extern IntPtr gs1_encoder_getScanData(GS1EncoderHandle ctx);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_setScanData", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)]
-        private static extern bool gs1_encoder_setScanData(IntPtr ctx, string scanData);
+        private static extern bool gs1_encoder_setScanData(GS1EncoderHandle ctx, string scanData);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getDLuri", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr gs1_encoder_getDLuri(IntPtr ctx, string stem);
+        private static extern IntPtr gs1_encoder_getDLuri(GS1EncoderHandle ctx, string stem);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getHRI", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int gs1_encoder_getHRI(IntPtr ctx, ref IntPtr hri);
+        private static extern int gs1_encoder_getHRI(GS1EncoderHandle ctx, ref IntPtr hri);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_getDLignoredQueryParams", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int gs1_encoder_getDLignoredQueryParams(IntPtr ctx, ref IntPtr qp);
+        private static extern int gs1_encoder_getDLignoredQueryParams(GS1EncoderHandle ctx, ref IntPtr qp);
 
         [DllImport(gs1_dll, EntryPoint = "gs1_encoder_free", CallingConvention = CallingConvention.Cdecl)]
         private static extern void gs1_encoder_free(IntPtr ctx);
@@ -324,7 +347,7 @@ namespace GS1.Encoders
                     }
                 }
                 ctx = gs1_encoder_init_ex(IntPtr.Zero, ref opts);
-                if (ctx == IntPtr.Zero)
+                if (ctx.IsInvalid)
                 {
                     string msg = Marshal.PtrToStringAnsi(msgBufPtr);
                     throw new GS1EncoderGeneralException(
@@ -662,6 +685,8 @@ namespace GS1.Encoders
             }
             set
             {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
                 if (!gs1_encoder_setDataStr(ctx, value))
                     throw new GS1EncoderParameterException(ErrMsg);
             }
@@ -715,6 +740,8 @@ namespace GS1.Encoders
             }
             set
             {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
                 if (!gs1_encoder_setAIdataStr(ctx, value))
                     throw new GS1EncoderParameterException(ErrMsg);
             }
@@ -777,6 +804,8 @@ namespace GS1.Encoders
             }
             set
             {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
                 if (!gs1_encoder_setScanData(ctx, value))
                     throw new GS1EncoderScanDataException(ErrMsg);
             }
@@ -911,29 +940,26 @@ namespace GS1.Encoders
         /// <summary>
         /// Releases the resources used by this GS1Encoder instance.
         /// </summary>
-        /// <param name="disposing">True if called from Dispose; false if called from the finalizer.</param>
+        /// <param name="disposing">True if called from Dispose; false if called from a finalizer.</param>
         protected virtual void Dispose(bool disposing)
         {
-            if (ctx != IntPtr.Zero)
-            {
-                gs1_encoder_free(ctx);
-                ctx = IntPtr.Zero;
-            }
+            ctx.Dispose();
         }
 
         /// <summary>
         /// Releases the resources used by this GS1Encoder instance.
         /// </summary>
+        /// <remarks>
+        /// Disposal is idempotent. Any other member used after disposal
+        /// throws <see cref="ObjectDisposedException"/>. The native context
+        /// is owned by a SafeHandle, so no finalizer is required on this
+        /// class and the context cannot be reclaimed while a native call
+        /// is in flight.
+        /// </remarks>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
-        }
-
-        /// <exclude />
-        ~GS1Encoder()
-        {
-            Dispose(false);
         }
 
     }

@@ -276,7 +276,7 @@ specifically EAN/UPC and GS1 DataBar except Expanded (Stacked).
 
         
             
-<h4 class="name" id="aiDataStr"><span class="type-signature"></span>aiDataStr<span class="type-signature"> :string</span></h4>
+<h4 class="name" id="aiDataStr"><span class="type-signature"></span>aiDataStr<span class="type-signature"> :string|null</span></h4>
 
 
 
@@ -316,10 +316,66 @@ and DotCode), the data for the linear and 2D components can be separated by a
         <li>
             
 <span class="param-type">string</span>
+|
+
+<span class="param-type">null</span>
 
 
         </li>
     </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="aiDataStr"><span class="type-signature"></span>aiDataStr<span class="type-signature"></span></h4>
+
+
+
+
+
 
 
 
@@ -1400,6 +1456,9 @@ Returns a string containing the version of the library, typically the build date
 
 <div class="description">
     Frees the resources associated with this encoder instance.
+<p>
+Freeing is idempotent; any other use of a freed instance throws
+<a href="GS1encoderGeneralException.html">GS1encoderGeneralException</a>.
 </div>
 
 

@@ -17,11 +17,14 @@
 
 """Tests for the Python 3 binding for the GS1 Barcode Syntax Engine."""
 
+import ctypes
 import unittest
+import unittest.mock
 
 from gs1encoders import (
     GS1Encoder,
     GS1EncoderDigitalLinkException,
+    GS1EncoderGeneralException,
     GS1EncoderParameterException,
     GS1EncoderScanDataException,
     Symbology,
@@ -218,6 +221,58 @@ class GS1EncoderTest(unittest.TestCase):
     def test_context_manager(self):
         with GS1Encoder() as gs1encoder:
             self.assertTrue(gs1encoder.version)
+
+    def test_init_failure_raises(self):
+        # A NULL return from gs1_encoder_init is a falsy pointer, not None
+        api = GS1Encoder._GS1Encoder__api
+        null_ctx = ctypes.POINTER(ctypes.c_void_p)()
+        with unittest.mock.patch.object(api, "gs1_encoder_init", return_value=null_ctx):
+            with self.assertRaises(GS1EncoderGeneralException):
+                GS1Encoder()
+
+    def test_use_after_free(self):
+        gs1encoder = GS1Encoder()
+        gs1encoder.free()
+        gs1encoder.free()
+
+        self.assertTrue(gs1encoder.version)
+
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.sym
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.sym = Symbology.QR
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.add_check_digit
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.add_check_digit = True
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.permit_unknown_ais = True
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.get_validation_enabled(Validation.REQUISITE_AIS)
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.set_validation_enabled(Validation.REQUISITE_AIS, True)
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.include_data_titles_in_hri = True
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.data_str
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.data_str = "^0112312312312333"
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.ai_data_str
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.ai_data_str = "(01)12312312312319"
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.scan_data
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.scan_data = "]Q1https://id.gs1.org/01/12312312312319"
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.get_dl_uri()
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.hri
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.dl_ignored_query_params
+        with self.assertRaises(GS1EncoderGeneralException):
+            gs1encoder.err_markup
 
 
 if __name__ == "__main__":

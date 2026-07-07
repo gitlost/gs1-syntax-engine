@@ -175,7 +175,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 
 			for (e = ctx->aiTable; *e->ai && count < MAX_AIS; e++, count++) {
 
-				char piece[2 + MAX_AI_LEN + MAX_PARTS*99 + 1];
+				char piece[2 + MAX_AI_LEN + MAX_PARTS*UINT8_MAX + 1];	// aiComponent.max is uint8_t
 				size_t pn = 0;
 				int p;
 

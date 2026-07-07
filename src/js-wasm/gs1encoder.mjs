@@ -97,6 +97,9 @@ export class GS1encoder {
      */
     async init(options) {
 
+        if (this.ctx)
+            throw new GS1encoderGeneralException("GS1encoder instance is already initialised");
+
         /**
          *  Load the WASM
          *  @private
@@ -292,14 +295,30 @@ export class GS1encoder {
 
     /**
      * Frees the resources associated with this encoder instance.
+     * <p>
+     * Freeing is idempotent; any other use of a freed instance throws
+     * {@link GS1encoderGeneralException}.
+     *
      * @returns {void}
      */
     free() {
-        if (this.ctx !== null) {
+        if (this.ctx) {         // A failed init leaves ctx === 0, which must not be freed
             _registry.unregister(this);
             this.api.gs1_encoder_free(this.ctx);
-            this.ctx = null;
         }
+        this.ctx = null;
+    }
+
+
+    /**
+     * A freed or uninitialised context must not reach the native library,
+     * whose entry points require a valid instance.
+     * @private
+     */
+    _checkedCtx() {
+        if (!this.ctx)
+            throw new GS1encoderGeneralException("GS1encoder instance is not initialised or has been freed");
+        return this.ctx;
     }
 
 
@@ -330,7 +349,7 @@ export class GS1encoder {
      * @returns {string}
      */
     get errMarkup() {
-        return this.api.gs1_encoder_getErrMarkup(this.ctx);
+        return this.api.gs1_encoder_getErrMarkup(this._checkedCtx());
     }
 
 
@@ -346,14 +365,14 @@ export class GS1encoder {
      * @see GS1encoder.symbology
      */
     get sym() {
-        return this.api.gs1_encoder_getSym(this.ctx);
+        return this.api.gs1_encoder_getSym(this._checkedCtx());
     }
     /**
      * @param {Symbology} value
      */
     set sym(value) {
-        if (!this.api.gs1_encoder_setSym(this.ctx, value))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (!this.api.gs1_encoder_setSym(this._checkedCtx(), value))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -372,14 +391,14 @@ export class GS1encoder {
      * @throws {GS1encoderParameterException} if the value is invalid
      */
     get addCheckDigit() {
-        return this.api.gs1_encoder_getAddCheckDigit(this.ctx) != 0;
+        return this.api.gs1_encoder_getAddCheckDigit(this._checkedCtx()) != 0;
     }
     /**
      * @param {boolean} value
      */
     set addCheckDigit(value) {
-        if (!this.api.gs1_encoder_setAddCheckDigit(this.ctx, value ? 1 : 0))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (!this.api.gs1_encoder_setAddCheckDigit(this._checkedCtx(), value ? 1 : 0))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -404,11 +423,11 @@ export class GS1encoder {
      * @throws {@link GS1encoderParameterException}
      */
     get permitUnknownAIs() {
-        return this.api.gs1_encoder_getPermitUnknownAIs(this.ctx) != 0;
+        return this.api.gs1_encoder_getPermitUnknownAIs(this._checkedCtx()) != 0;
     }
     set permitUnknownAIs(value) {
-        if (!this.api.gs1_encoder_setPermitUnknownAIs(this.ctx, value ? 1 : 0))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (!this.api.gs1_encoder_setPermitUnknownAIs(this._checkedCtx(), value ? 1 : 0))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -432,11 +451,11 @@ export class GS1encoder {
      * @throws {@link GS1encoderParameterException}
      */
     get permitZeroSuppressedGTINinDLuris() {
-        return this.api.gs1_encoder_getPermitZeroSuppressedGTINinDLuris(this.ctx) != 0;
+        return this.api.gs1_encoder_getPermitZeroSuppressedGTINinDLuris(this._checkedCtx()) != 0;
     }
     set permitZeroSuppressedGTINinDLuris(value) {
-        if (!this.api.gs1_encoder_setPermitZeroSuppressedGTINinDLuris(this.ctx, value ? 1 : 0))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (!this.api.gs1_encoder_setPermitZeroSuppressedGTINinDLuris(this._checkedCtx(), value ? 1 : 0))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -452,11 +471,11 @@ export class GS1encoder {
      * @throws {@link GS1encoderParameterException}
      */
     get includeDataTitlesInHRI() {
-        return this.api.gs1_encoder_getIncludeDataTitlesInHRI(this.ctx) != 0;
+        return this.api.gs1_encoder_getIncludeDataTitlesInHRI(this._checkedCtx()) != 0;
     }
     set includeDataTitlesInHRI(value) {
-        if (!this.api.gs1_encoder_setIncludeDataTitlesInHRI(this.ctx, value ? 1 : 0))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (!this.api.gs1_encoder_setIncludeDataTitlesInHRI(this._checkedCtx(), value ? 1 : 0))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -467,7 +486,7 @@ export class GS1encoder {
      * @returns {boolean} <code>true</code> if the AI validation procedure is currently enabled; <code>false</code> otherwise
      */
     getValidationEnabled(validation) {
-        return this.api.gs1_encoder_getValidationEnabled(this.ctx, validation) != 0;
+        return this.api.gs1_encoder_getValidationEnabled(this._checkedCtx(), validation) != 0;
     }
 
 
@@ -488,8 +507,8 @@ export class GS1encoder {
      * @throws {GS1encoderParameterException}
      */
     setValidationEnabled(validation, value) {
-        if (!this.api.gs1_encoder_setValidationEnabled(this.ctx, validation, value ? 1 : 0))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (!this.api.gs1_encoder_setValidationEnabled(this._checkedCtx(), validation, value ? 1 : 0))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -542,18 +561,23 @@ export class GS1encoder {
      * <p>
      * <pre>(01)12345678901231|(10)ABC123(11)210630</pre>
      *
-     * @type {string}
+     * @type {string|null}
      * @throws {@link GS1encoderParameterException}
      */
     get aiDataStr() {
-        const c_str = this.api.gs1_encoder_getAIdataStr(this.ctx);
+        const c_str = this.api.gs1_encoder_getAIdataStr(this._checkedCtx());
         if (!c_str)
             return null;
         return this.module.UTF8ToString(c_str);
     }
+    /**
+     * @param {string} value
+     */
     set aiDataStr(value) {
-        if (!this.api.gs1_encoder_setAIdataStr(this.ctx, value))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (typeof value !== "string")
+            throw new TypeError("value must be a string");
+        if (!this.api.gs1_encoder_setAIdataStr(this._checkedCtx(), value))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
     /**
@@ -600,11 +624,13 @@ export class GS1encoder {
      * @see {@link GS1encoder#errMarkup}
      */
     get dataStr() {
-        return this.api.gs1_encoder_getDataStr(this.ctx);
+        return this.api.gs1_encoder_getDataStr(this._checkedCtx());
     }
     set dataStr(value) {
-        if (!this.api.gs1_encoder_setDataStr(this.ctx, value))
-            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (typeof value !== "string")
+            throw new TypeError("value must be a string");
+        if (!this.api.gs1_encoder_setDataStr(this._checkedCtx(), value))
+            throw new GS1encoderParameterException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -622,9 +648,11 @@ export class GS1encoder {
      * @throws {GS1encoderDigitalLinkException}
      */
     getDLuri(stem = null) {
-        const c_str = this.api.gs1_encoder_getDLuri(this.ctx, stem);
+        if (stem !== null && typeof stem !== "string")
+            throw new TypeError("stem must be a string or null");
+        const c_str = this.api.gs1_encoder_getDLuri(this._checkedCtx(), stem);
         if (!c_str)
-            throw new GS1encoderDigitalLinkException(this.api.gs1_encoder_getErrMsg(this.ctx));
+            throw new GS1encoderDigitalLinkException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
         return this.module.UTF8ToString(c_str);
     }
 
@@ -665,14 +693,16 @@ export class GS1encoder {
      * @throws {@link GS1encoderScanDataException} when setting, if the scan data is invalid
      */
     get scanData() {
-        const c_str = this.api.gs1_encoder_getScanData(this.ctx);
+        const c_str = this.api.gs1_encoder_getScanData(this._checkedCtx());
         if (!c_str)
-            throw new GS1encoderScanDataException(this.api.gs1_encoder_getErrMsg(this.ctx));
+            throw new GS1encoderScanDataException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
         return this.module.UTF8ToString(c_str);
     }
     set scanData(value) {
-        if (!this.api.gs1_encoder_setScanData(this.ctx, value))
-            throw new GS1encoderScanDataException(this.api.gs1_encoder_getErrMsg(this.ctx));
+        if (typeof value !== "string")
+            throw new TypeError("value must be a string");
+        if (!this.api.gs1_encoder_setScanData(this._checkedCtx(), value))
+            throw new GS1encoderScanDataException(this.api.gs1_encoder_getErrMsg(this._checkedCtx()));
     }
 
 
@@ -695,7 +725,7 @@ export class GS1encoder {
      */
     get hri() {
         const ptr = this.module._malloc(Uint32Array.BYTES_PER_ELEMENT);
-        const size = this.api.gs1_encoder_getHRI(this.ctx, ptr);
+        const size = this.api.gs1_encoder_getHRI(this._checkedCtx(), ptr);
         const hri = Array(size);
         for (let i = 0, p = this.module.getValue(ptr, 'i32');
              i < size;
@@ -723,7 +753,7 @@ export class GS1encoder {
      */
     get dlIgnoredQueryParams() {
         const ptr = this.module._malloc(Uint32Array.BYTES_PER_ELEMENT);
-        const size = this.api.gs1_encoder_getDLignoredQueryParams(this.ctx, ptr);
+        const size = this.api.gs1_encoder_getDLignoredQueryParams(this._checkedCtx(), ptr);
         const qp = Array(size);
         for (let i = 0, p = this.module.getValue(ptr, 'i32');
              i < size;

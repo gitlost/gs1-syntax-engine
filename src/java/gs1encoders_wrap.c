@@ -52,15 +52,24 @@ JNIEXPORT jlong JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderInitExJNI(
     (void)obj;
     if (initOptions) {
         jclass cls = (*env)->GetObjectClass(env, initOptions);
-        jfieldID synFid    = (*env)->GetFieldID(env, cls, "syntaxDictionary",       "Ljava/lang/String;");
-        jfieldID fbFid     = (*env)->GetFieldID(env, cls, "fallbackOnSyndictError", "Z");
-        jfieldID noEmbFid  = (*env)->GetFieldID(env, cls, "noEmbedded",             "Z");
+        jfieldID synFid, fbFid, noEmbFid;
+        synFid = (*env)->GetFieldID(env, cls, "syntaxDictionary", "Ljava/lang/String;");
+        if (synFid == NULL)
+            return 0;    /* NoSuchFieldError pending */
+        fbFid = (*env)->GetFieldID(env, cls, "fallbackOnSyndictError", "Z");
+        if (fbFid == NULL)
+            return 0;    /* NoSuchFieldError pending */
+        noEmbFid = (*env)->GetFieldID(env, cls, "noEmbedded", "Z");
+        if (noEmbFid == NULL)
+            return 0;    /* NoSuchFieldError pending */
         syntaxDictionary = (*env)->GetObjectField(env, initOptions, synFid);
         if ((*env)->GetBooleanField(env, initOptions, fbFid))    opts.flags |= gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR;
         if ((*env)->GetBooleanField(env, initOptions, noEmbFid)) opts.flags |= gs1_encoder_iNO_EMBEDDED;
     }
     if (syntaxDictionary) {
         path = (*env)->GetStringUTFChars(env, syntaxDictionary, NULL);
+        if (path == NULL)
+            return 0;    /* OutOfMemoryError pending */
         opts.syntaxDictionary = path;
     }
     ret = (jlong)gs1_encoder_init_ex(NULL, &opts);
@@ -71,8 +80,14 @@ JNIEXPORT jlong JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderInitExJNI(
      * == GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE — currently the only
      * success-with-message case the C library produces). */
     if (outErrorMessage && msgBuf[0] != '\0') {
-        (*env)->SetObjectArrayElement(env, outErrorMessage, 0,
-                                      (*env)->NewStringUTF(env, msgBuf));
+        jstring msg = (*env)->NewStringUTF(env, msgBuf);
+        if (msg == NULL) {
+            /* OutOfMemoryError pending; do not leak the context */
+            if (ret)
+                gs1_encoder_free((gs1_encoder *)ret);
+            return 0;
+        }
+        (*env)->SetObjectArrayElement(env, outErrorMessage, 0, msg);
     }
     return ret;
 }
@@ -197,14 +212,14 @@ JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetData
         jlong ctx,
         jstring value) {
     const char* str;
-    jboolean isCopy;
     jboolean ret;
 
-    str = (*env)->GetStringUTFChars(env, value, &isCopy);
-    ret = gs1_encoder_setDataStr((gs1_encoder*)ctx, str);
+    str = (*env)->GetStringUTFChars(env, value, NULL);
+    if (str == NULL)
+        return JNI_FALSE;    /* OutOfMemoryError pending */
 
-    if (isCopy == JNI_TRUE)
-        (*env)->ReleaseStringUTFChars(env, value, str);
+    ret = gs1_encoder_setDataStr((gs1_encoder*)ctx, str);
+    (*env)->ReleaseStringUTFChars(env, value, str);
 
     return ret;
 }
@@ -223,14 +238,14 @@ JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetAIda
         jlong ctx,
         jstring value) {
     const char* str;
-    jboolean isCopy;
     jboolean ret;
 
-    str = (*env)->GetStringUTFChars(env, value, &isCopy);
-    ret = gs1_encoder_setAIdataStr((gs1_encoder*)ctx, str);
+    str = (*env)->GetStringUTFChars(env, value, NULL);
+    if (str == NULL)
+        return JNI_FALSE;    /* OutOfMemoryError pending */
 
-    if (isCopy == JNI_TRUE)
-        (*env)->ReleaseStringUTFChars(env, value, str);
+    ret = gs1_encoder_setAIdataStr((gs1_encoder*)ctx, str);
+    (*env)->ReleaseStringUTFChars(env, value, str);
 
     return ret;
 }
@@ -249,14 +264,14 @@ JNIEXPORT jboolean JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderSetScan
         jlong ctx,
         jstring value) {
     const char* str;
-    jboolean isCopy;
     jboolean ret;
 
-    str = (*env)->GetStringUTFChars(env, value, &isCopy);
-    ret = gs1_encoder_setScanData((gs1_encoder*)ctx, str);
+    str = (*env)->GetStringUTFChars(env, value, NULL);
+    if (str == NULL)
+        return JNI_FALSE;    /* OutOfMemoryError pending */
 
-    if (isCopy == JNI_TRUE)
-        (*env)->ReleaseStringUTFChars(env, value, str);
+    ret = gs1_encoder_setScanData((gs1_encoder*)ctx, str);
+    (*env)->ReleaseStringUTFChars(env, value, str);
 
     return ret;
 }
@@ -277,11 +292,13 @@ JNIEXPORT jstring JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGetDLuri
 
     const char* out;
     const char* str;
-    jboolean isCopy = JNI_FALSE;
 
-    str = stem ? (*env)->GetStringUTFChars(env, stem, &isCopy) : NULL;
+    str = stem ? (*env)->GetStringUTFChars(env, stem, NULL) : NULL;
+    if (stem != NULL && str == NULL)
+        return NULL;    /* OutOfMemoryError pending */
+
     out = gs1_encoder_getDLuri((gs1_encoder*)ctx, (char*)str);
-    if (isCopy == JNI_TRUE)
+    if (str != NULL)
         (*env)->ReleaseStringUTFChars(env, stem, str);
 
     return out ? (*env)->NewStringUTF(env, out) : NULL;
@@ -293,13 +310,22 @@ JNIEXPORT jobjectArray JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGet
         jlong ctx) {
     char **hri;
     jobjectArray ret;
+    jclass stringClass;
     int i, numAIs;
     numAIs = gs1_encoder_getHRI((gs1_encoder*)ctx, &hri);
-    ret = (jobjectArray)(*env)->NewObjectArray(env, numAIs,
-                                               (*env)->FindClass(env, "java/lang/String"),
-                                               (*env)->NewStringUTF(env, ""));
-    for (i = 0; i < numAIs; i++)
-        (*env)->SetObjectArrayElement(env, ret, i, (*env)->NewStringUTF(env, hri[i]));
+    stringClass = (*env)->FindClass(env, "java/lang/String");
+    if (stringClass == NULL)
+        return NULL;    /* exception pending */
+    ret = (*env)->NewObjectArray(env, numAIs, stringClass, NULL);
+    if (ret == NULL)
+        return NULL;    /* exception pending */
+    for (i = 0; i < numAIs; i++) {
+        jstring line = (*env)->NewStringUTF(env, hri[i]);
+        if (line == NULL)
+            return NULL;    /* exception pending */
+        (*env)->SetObjectArrayElement(env, ret, i, line);
+        (*env)->DeleteLocalRef(env, line);
+    }
     return ret;
 }
 
@@ -309,12 +335,21 @@ JNIEXPORT jobjectArray JNICALL Java_org_gs1_gs1encoders_GS1Encoder_gs1encoderGet
         jlong ctx) {
     char **qp;
     jobjectArray ret;
+    jclass stringClass;
     int i, numAIs;
     numAIs = gs1_encoder_getDLignoredQueryParams((gs1_encoder*)ctx, &qp);
-    ret = (jobjectArray)(*env)->NewObjectArray(env, numAIs,
-                                               (*env)->FindClass(env, "java/lang/String"),
-                                               (*env)->NewStringUTF(env, ""));
-    for (i = 0; i < numAIs; i++)
-        (*env)->SetObjectArrayElement(env, ret, i, (*env)->NewStringUTF(env, qp[i]));
+    stringClass = (*env)->FindClass(env, "java/lang/String");
+    if (stringClass == NULL)
+        return NULL;    /* exception pending */
+    ret = (*env)->NewObjectArray(env, numAIs, stringClass, NULL);
+    if (ret == NULL)
+        return NULL;    /* exception pending */
+    for (i = 0; i < numAIs; i++) {
+        jstring qpStr = (*env)->NewStringUTF(env, qp[i]);
+        if (qpStr == NULL)
+            return NULL;    /* exception pending */
+        (*env)->SetObjectArrayElement(env, ret, i, qpStr);
+        (*env)->DeleteLocalRef(env, qpStr);
+    }
     return ret;
 }

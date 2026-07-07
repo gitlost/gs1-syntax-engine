@@ -190,6 +190,49 @@ public class GS1EncoderTest {
     }
 
     @Test
+    public void testUseAfterClose() throws Exception {
+        GS1Encoder gs1encoder = new GS1Encoder();
+        gs1encoder.close();
+        gs1encoder.close();
+
+        assertDoesNotThrow(gs1encoder::getVersion);
+
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getSym());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setSym(GS1Encoder.Symbology.QR));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getAddCheckDigit());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setAddCheckDigit(true));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getIncludeDataTitlesInHRI());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setIncludeDataTitlesInHRI(true));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getPermitUnknownAIs());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setPermitUnknownAIs(true));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getPermitZeroSuppressedGTINinDLuris());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setPermitZeroSuppressedGTINinDLuris(true));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getValidationEnabled(GS1Encoder.Validation.RequisiteAIs));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setValidationEnabled(GS1Encoder.Validation.RequisiteAIs, true));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getDataStr());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setDataStr("^0112312312312333"));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getAIdataStr());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setAIdataStr("(01)12312312312319"));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getScanData());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.setScanData("]Q1https://id.gs1.org/01/12312312312319"));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getErrMarkup());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getDLuri(null));
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getHRI());
+        assertThrows(IllegalStateException.class, () -> gs1encoder.getDLignoredQueryParams());
+    }
+
+    @Test
+    public void testNullDataSetterArguments() throws Exception {
+        GS1Encoder gs1encoder = new GS1Encoder();
+
+        assertThrows(NullPointerException.class, () -> gs1encoder.setDataStr(null));
+        assertThrows(NullPointerException.class, () -> gs1encoder.setAIdataStr(null));
+        assertThrows(NullPointerException.class, () -> gs1encoder.setScanData(null));
+
+        gs1encoder.free();
+    }
+
+    @Test
     public void testNonAIdata() throws Exception {
         GS1Encoder gs1encoder = new GS1Encoder();
 

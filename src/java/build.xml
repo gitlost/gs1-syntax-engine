@@ -183,7 +183,45 @@
     <echo>To run: java -Djava.library.path=${src} -classpath ${src}:${jar} Example</echo>
   </target>
 
-  <target name="test" depends="example,compile-test">
+  <property name="wraptestfile" location="gs1encoders_wrap_test.c"/>
+  <property name="wraptestexe-cc" location="${build}/gs1encoders_wrap_test"/>
+  <property name="wraptestexe-cl" location="${build}/gs1encoders_wrap_test.exe"/>
+
+  <target name="wraptest-cc" if="is.compiler.cc" depends="init">
+    <exec executable="cc" failonerror="true">
+      <arg line="-O2 -g -Werror" />
+      <arg line="-I${clib}" />
+      <arg line="-I${java.home}/../include" />
+      <arg line="-I${java.home}/../include/${os.family}" />
+      <arg line="-I${java.home}/include" />
+      <arg line="-I${java.home}/include/${os.family}" />
+      <arg line="-o ${wraptestexe-cc}" />
+      <arg line="${wraptestfile} ${wrapfile} ${clib}/build/libgs1encoders.a" />
+    </exec>
+    <exec executable="${wraptestexe-cc}" failonerror="true"/>
+  </target>
+
+  <target name="wraptest-cl" if="is.compiler.cl" depends="init">
+    <mkdir dir="${build}/obj"/>
+    <exec executable="cl.exe" failonerror="true">
+      <arg line="/MD /O2 /EHsc" />
+      <arg line="/D_CRT_SECURE_NO_WARNINGS /DGS1_LINTER_ERR_STR_EN" />
+      <arg line="/I${clib}" />
+      <arg line="'-I${java.home}/include'" />
+      <arg line="'-I${java.home}/include/${os.family}'" />
+      <arg line="'/Fo${build}/obj/'" />
+      <arg line="'/Fe:${wraptestexe-cl}'" />
+      <arg line="${clib}/ai.c ${clib}/dl.c ${clib}/gs1encoders.c ${clib}/scandata.c ${clib}/syn.c" />
+      <arg line="${clib}/syntax/gs1syntaxdictionary.c ${clib}/syntax/lint_*.c" />
+      <arg line="${wraptestfile} ${wrapfile}" />
+    </exec>
+    <exec executable="${wraptestexe-cl}" failonerror="true"/>
+  </target>
+
+  <target name="wraptest" depends="wraptest-cc,wraptest-cl"
+          description="unit test the JNI wrapper against a mock JNI environment"/>
+
+  <target name="test" depends="example,compile-test,wraptest">
     <copy file="${clib}/gs1-syntax-dictionary.txt" todir="${src}" overwrite="true"/>
     <java classname="Example" failonerror="true" classpath="${src}:${jar}" fork="true">
       <sysproperty key="java.library.path" path="${src}"/>

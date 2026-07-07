@@ -82,6 +82,11 @@
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public class GS1Encoder : IDisposable</code></pre>
   </div>
+  <h5 id="GS1_Encoders_GS1Encoder_remarks"><strong>Remarks</strong></h5>
+  <div class="markdown level0 remarks"><p>The library is thread-safe provided that each thread operates on its
+own GS1Encoder instance. This applies also to the property getters,
+which mutate internal buffers of the native context.</p>
+</div>
   <h3 id="constructors">Constructors
 </h3>
   <a id="GS1_Encoders_GS1Encoder__ctor_" data-uid="GS1.Encoders.GS1Encoder.#ctor*"></a>
@@ -820,6 +825,13 @@ This property is equivalent to using the <a class="xref" href="GS1.Encoders.GS1E
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
+  <h5 id="GS1_Encoders_GS1Encoder_Dispose_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>Disposal is idempotent. Any other member used after disposal
+throws <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>. The native context
+is owned by a SafeHandle, so no finalizer is required on this
+class and the context cannot be reclaimed while a native call
+is in flight.</p>
+</div>
   <a id="GS1_Encoders_GS1Encoder_Dispose_" data-uid="GS1.Encoders.GS1Encoder.Dispose*"></a>
   <h4 id="GS1_Encoders_GS1Encoder_Dispose_System_Boolean_" data-uid="GS1.Encoders.GS1Encoder.Dispose(System.Boolean)">Dispose(bool)</h4>
   <div class="markdown level1 summary"><p>Releases the resources used by this GS1Encoder instance.</p>
@@ -842,7 +854,7 @@ This property is equivalent to using the <a class="xref" href="GS1.Encoders.GS1E
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td><p>True if called from Dispose; false if called from the finalizer.</p>
+        <td><p>True if called from Dispose; false if called from a finalizer.</p>
 </td>
       </tr>
     </tbody>

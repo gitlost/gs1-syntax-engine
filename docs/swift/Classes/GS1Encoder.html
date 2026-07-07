@@ -273,7 +273,9 @@ without breaking existing call sites.</p>
                         <p>Release library resources.</p>
 
 <p>This method will release the resources allocated by the native library.
-After calling this method, the GS1Encoder instance should not be used.</p>
+Freeing is idempotent. Any other use of a freed instance stops the
+program with a precondition failure rather than passing a stale
+context to the native library.</p>
 
                       </div>
                       <div class="declaration">
