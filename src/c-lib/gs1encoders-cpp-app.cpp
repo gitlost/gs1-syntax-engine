@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "gs1encoders.hpp"
@@ -123,7 +124,7 @@ void render_state(const enc::GS1Encoder &gs) {
 		}
 	}
 
-	const auto hri = dataStr.empty() ? std::vector<std::string>{} : gs.hri();
+	const auto &hri = dataStr.empty() ? std::vector<std::string>{} : gs.hri();
 	std::cout << "\n    HRI:                    "
 	          << (!dataStr.empty() && hri.empty() ? "⧚ Not AI-based data ⧚" : "")
 	          << "\n";
@@ -241,7 +242,7 @@ int main(int argc, char *argv[]) {
 	 */
 	enc::InitOpts opts;
 	if (!syntaxDictionary.empty()) {
-		opts.syntax_dictionary(syntaxDictionary);
+		opts.syntax_dictionary(std::move(syntaxDictionary));
 	} else {
 		opts.syntax_dictionary("gs1-syntax-dictionary.txt")
 		    .fallback_on_syndict_error(true);
