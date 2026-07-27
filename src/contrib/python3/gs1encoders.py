@@ -300,30 +300,40 @@ class GS1Encoder:
 
     @permit_unknown_ais.setter
     def permit_unknown_ais(self, value: bool) -> None:
-        ret: bool = self.__api.gs1_encoder_setPermitUnknownAIs(self.__checked_ctx(), 1 if value else 0)
+        ret: bool = self.__api.gs1_encoder_setPermitUnknownAIs(
+            self.__checked_ctx(), 1 if value else 0
+        )
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     @property
     def permit_zero_suppressed_gtin_in_dl_uris(self) -> bool:
         """Whether zero-suppressed GTINs are permitted in DL URIs."""
-        return bool(self.__api.gs1_encoder_getPermitZeroSuppressedGTINinDLuris(self.__checked_ctx()))
+        return bool(
+            self.__api.gs1_encoder_getPermitZeroSuppressedGTINinDLuris(self.__checked_ctx())
+        )
 
     @permit_zero_suppressed_gtin_in_dl_uris.setter
     def permit_zero_suppressed_gtin_in_dl_uris(self, value: bool) -> None:
         val: int = 1 if value else 0
-        ret: bool = self.__api.gs1_encoder_setPermitZeroSuppressedGTINinDLuris(self.__checked_ctx(), val)
+        ret: bool = self.__api.gs1_encoder_setPermitZeroSuppressedGTINinDLuris(
+            self.__checked_ctx(), val
+        )
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
     def get_validation_enabled(self, validation: Validation) -> bool:
         """Return whether the specified validation is enabled."""
-        return bool(self.__api.gs1_encoder_getValidationEnabled(self.__checked_ctx(), int(validation)))
+        return bool(
+            self.__api.gs1_encoder_getValidationEnabled(self.__checked_ctx(), int(validation))
+        )
 
     def set_validation_enabled(self, validation: Validation, enabled: bool) -> None:
         """Enable or disable the specified validation."""
         val: int = 1 if enabled else 0
-        ret: bool = self.__api.gs1_encoder_setValidationEnabled(self.__checked_ctx(), int(validation), val)
+        ret: bool = self.__api.gs1_encoder_setValidationEnabled(
+            self.__checked_ctx(), int(validation), val
+        )
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
@@ -352,7 +362,9 @@ class GS1Encoder:
 
     @include_data_titles_in_hri.setter
     def include_data_titles_in_hri(self, value: bool) -> None:
-        ret: bool = self.__api.gs1_encoder_setIncludeDataTitlesInHRI(self.__checked_ctx(), 1 if value else 0)
+        ret: bool = self.__api.gs1_encoder_setIncludeDataTitlesInHRI(
+            self.__checked_ctx(), 1 if value else 0
+        )
         if not ret:
             raise GS1EncoderParameterException(self._get_err_msg())
 
@@ -417,7 +429,9 @@ class GS1Encoder:
     def dl_ignored_query_params(self) -> list[str]:
         """Non-AI query parameters from a GS1 Digital Link URI."""
         ptr = ctypes.pointer(ctypes.c_char_p())
-        size: int = self.__api.gs1_encoder_getDLignoredQueryParams(self.__checked_ctx(), ctypes.byref(ptr))
+        size: int = self.__api.gs1_encoder_getDLignoredQueryParams(
+            self.__checked_ctx(), ctypes.byref(ptr)
+        )
         params: list[str] = []
         for i in range(size):
             params.append(ptr[i].decode("utf-8"))
