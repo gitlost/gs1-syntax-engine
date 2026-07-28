@@ -643,7 +643,6 @@ superlinter:
 		-e RUN_LOCAL=true \
 		-e VALIDATE_ALL_CODEBASE=true \
 		-e DEFAULT_BRANCH=master \
-		-e IGNORE_GITIGNORED_FILES=true \
 		-e LINTER_RULES_PATH=.github/linters \
 		-e 'FILTER_REGEX_EXCLUDE=(src/c-lib/syntax/|src/c-lib/aitable\.|docs/|maintenance/docker/.*/build/|node_modules/|\.gradle/|Pods/|\.build/|src/c-lib/build|src/android/gradlew|corpus-|src/android/app/src/main/cpp/gs1encoders(/|$$)|src/swift/Sources/CGS1Encoders/(c-lib|include)(/|$$))' \
 		$(shell grep -v '^\#' ../../.github/linters/superlinter-disabled.env | grep '=' | sed 's/^/-e /') \

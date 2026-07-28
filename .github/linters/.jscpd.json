@@ -1,8 +1,12 @@
 {
   "threshold": 5,
   "noSymlinks": true,
+  "mode": "weak",
   "ignore": [
+    "**/src/c-lib/acutest.h",
+    "**/src/c-lib/aitable.*",
     "**/src/c-lib/syntax/**",
+    "**/corpus-*/**",
     "**/docs/**",
     "**/maintenance/docker/**/build/**",
     "**/.build/**"
