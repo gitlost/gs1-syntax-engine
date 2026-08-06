@@ -50,4 +50,12 @@
 	snprintf(ctx->errMsg, sizeof(ctx->errMsg), ERR_TR(x));			\
 } while (0)
 
+// Runtime selection between two errors; token pasting precludes a ternary
+#define SET_ERR_V_COND(cond, x, y, ...) do {					\
+	if (cond)								\
+		SET_ERR_V(x, __VA_ARGS__);					\
+	else									\
+		SET_ERR_V(y, __VA_ARGS__);					\
+} while (0)
+
 #endif  /* TR_H */
