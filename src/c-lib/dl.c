@@ -1791,6 +1791,15 @@ void test_dl_parseDLuri(void) {
 	/* Percent-encoded null in DL query value */
 	test_parseDLuri(DECODED_AI_VALUE_FROM_QUERY_PARAMS_CONTAINS_ILLEGAL_NULL, "https://a/01/12312312312333?99=ABC%00DEF", "");
 
+	/* "+" in DL query value decodes to space, which is not CSET 82 ("+" is) */
+	test_parseDLuri(AI_LINTER_ERROR, "https://a/01/12312312312333?99=A+B", "");
+
+	/* "+" in DL path value remains literal */
+	test_parseDLuri(OK, "https://a/01/12312312312333/10/A+B", "^011231231231233310A+B");
+
+	/* Invalid percent-escape in DL path value is retained literally */
+	test_parseDLuri(OK, "https://a/01/12312312312333/10/A%4gB", "^011231231231233310A%4gB");
+
 
 	/*
 	 *  MAX_AI_VALUE_LEN boundary: AI (99) accepts X..90 in query
