@@ -49,8 +49,9 @@
 GS1_ENCODERS_STATIC_ASSERT((1ULL << MAX_DL_KEY_QUALIFIERS) <= INT_MAX);
 
 // Each AI's DL path position is held in uint8_t, with UINT8_MAX reserved as
-// the data-attribute sentinel
-GS1_ENCODERS_STATIC_ASSERT(MAX_AIS <= DL_PATH_ORDER_ATTRIBUTE);
+// the data-attribute sentinel, which must be outside the range of possible
+// path positions
+GS1_ENCODERS_STATIC_ASSERT(MAX_AIS < DL_PATH_ORDER_ATTRIBUTE);
 
 
 /*
@@ -496,6 +497,141 @@ static ssize_t URIescape(char* const out, const size_t maxlen, const char* const
 
 
 /*
+ * Look up an AI entry, resolving a convenience alpha when the feature is
+ * enabled.
+ *
+ */
+static const struct aiEntry* lookupDLaiEntry(const gs1_encoder* const ctx, const char* const ai, const size_t ailen, bool* const fromAlpha) {
+
+	const struct aiEntry *entry = NULL;
+
+	if (ctx->permitConvenienceAlphas &&
+	    ailen >= 3 && ailen <= 5 &&
+	    !isdigit((int)*ai))				// Possible convenience alpha
+		entry = aiEntryFromAlpha(ctx, ai, ailen);
+
+	*fromAlpha = entry != NULL;
+
+	if (!entry)
+		entry = gs1_lookupAIentry(ctx, ai, ailen);
+
+	return entry;
+
+}
+
+
+/*
+ * Emit an AI and its percent-decoded value to the AI data string and record
+ * the extracted AI value pair, with the checks and legacy transforms common to
+ * path info and query parameter processing. The undecoded value directly
+ * follows the AI and its terminating "/" or "=".
+ *
+ * Returns false on failure, with an error set except on writeDataStr
+ * overflow, where the caller's fail handling provides the generic error.
+ *
+ */
+static bool parseDLAIvaluePair(gs1_encoder* const ctx, const struct aiEntry* const entry,
+		const char* const ai, const size_t ailen,	// AI as written in the URI
+		const size_t rawvallen,				// Undecoded AI value length
+		const bool fromAlpha,				// Emit entry->ai, resolved from a convenience alpha
+		const uint8_t dlPathOrder,
+		bool* const fnc1req, char* const dataStr, size_t* const dataStr_len) {
+
+	const bool isQueryParam = dlPathOrder == DL_PATH_ORDER_ATTRIBUTE;
+	const char* const val = ai + ailen + 1;
+	const char *outai, *outval;
+	ssize_t vallen;
+	const size_t dataStrCap = MAX_DATA;	// dataStr is written from the start
+
+	DEBUG_PRINT("    Extracted AI: (%.*s)\n", (int)ailen, ai);
+
+	// Write out the AI
+	if (*fnc1req)
+		writeDataStr("^", 1, dataStr_len);			// Write FNC1, if required
+	outai = dataStr + *dataStr_len;					// Save start of AI for AI data
+	if (fromAlpha)
+		writeDataStr(entry->ai, entry->ailen, dataStr_len);	// Resolved from convenience alpha
+	else
+		writeDataStr(ai, ailen, dataStr_len);			// Might be an "unknown AI"
+	*fnc1req = entry->fnc1;						// Record if required before next AI
+
+	// Now process the AI value
+	if (rawvallen == 0) {
+		SET_ERR_V_COND(isQueryParam,
+			       AI_VALUE_QUERY_ELEMENT_IN_EMPTY,
+			       AI_VALUE_PATH_ELEMENT_IS_EMPTY,
+			       (int)ailen, ai);
+		goto fail;
+	}
+
+	// Save start of value for AI value
+	outval = dataStr + *dataStr_len;
+
+	// Reverse percent encoding
+	vallen = URIunescape(dataStr + *dataStr_len, MAX_DATA - *dataStr_len, val, rawvallen, isQueryParam);
+	assert(vallen >= 0);	// URI decoding should not overflow
+	if (vallen == 0) {
+		SET_ERR_V_COND(isQueryParam,
+			       DECODED_AI_VALUE_FROM_QUERY_PARAMS_CONTAINS_ILLEGAL_NULL,
+			       DECODED_AI_FROM_DL_PATH_INFO_CONTAINS_ILLEGAL_NULL,
+			       (int)ailen, ai);
+		goto fail;
+	}
+
+	// Legacy handling of AI (01) to pad up to a GTIN-14, when feature enabled
+	if (ctx->permitZeroSuppressedGTINinDLuris && strcmp(entry->ai, "01") == 0 &&
+	    (vallen == 13 || vallen == 12 || vallen == 8)) {
+		size_t j;
+		char *v = dataStr + *dataStr_len;
+		// LCOV_EXCL_START: unreachable while MAX_AIS caps dataStr_len far below MAX_DATA; defence in depth for the unguarded 14-byte write below
+		if (*dataStr_len + 14 > MAX_DATA) {
+			SET_ERR_V(DATA_TOO_LONG, MAX_DATA);
+			goto fail;
+		}
+		// LCOV_EXCL_STOP
+		for (j = 0; j <= 13; j++)
+			v[13-j] = vallen >= (ssize_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
+		v[14] = '\0';
+		vallen = 14;
+	}
+
+	// Update dataStr length and NULL terminate
+	*dataStr_len += (size_t)vallen;
+	dataStr[*dataStr_len] = '\0';
+
+	DEBUG_PRINT("    Extracted value: %.*s\n", (int)vallen, outval);
+
+	// Perform certain checks at parse time, before processing the
+	// components with the linters
+	if (!gs1_aiValLengthContentCheck(ctx, ai, entry, outval, (size_t)vallen))
+		goto fail;
+
+	// Update the AI data
+	if (ctx->numAIs >= MAX_AIS) {
+		SET_ERR(TOO_MANY_AIS);
+		goto fail;
+	}
+
+	ctx->aiData[ctx->numAIs++] = (struct aiValue) {
+		.kind = aiValue_aival,
+		.aiEntry = entry,
+		.ai = outai,
+		.ailen = (uint8_t)ailen,
+		.value = outval,
+		.vallen = (uint16_t)vallen,
+		.dlPathOrder = dlPathOrder
+	};
+
+	return true;
+
+fail:
+
+	return false;
+
+}
+
+
+/*
  * Parse a GS1 DL URI, validating the key to key-qualifier associations in the
  * path information, and convert it to a regular AI data string with ^ = FNC1,
  * extracting AI data for HRI purposes.
@@ -514,7 +650,6 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	int numPathAIs;
 	int i;
 	size_t dataStr_len = 0;
-	const size_t dataStrCap = MAX_DATA;	// dataStr is ctx->dlAIbuffer, written from the start
 
 	assert(ctx);
 	assert(dlData);
@@ -577,8 +712,9 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	// "/AI/value" pair where AI is a DL primary key
 	r = pi + strlen(pi);				// Start from end
 	while (r > pi) {
-		const struct aiEntry* entry = NULL;
+		const struct aiEntry* entry;
 		size_t ailen;
+		bool fromAlpha;
 
 		// Find previous slash by scanning backwards
 		while (r > pi && *--r != '/') ;
@@ -597,15 +733,7 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 
 		ailen = (size_t)(r-p-1);
 
-		if (ctx->permitConvenienceAlphas &&
-		    ailen >= 3 && ailen <= 5 &&
-		    !isdigit((int)*(p+1))) {		// Possible convenience alpha
-			entry = aiEntryFromAlpha(ctx, p+1, ailen);
-		}
-
-		if (!entry)
-			entry = gs1_lookupAIentry(ctx, p+1, ailen);
-
+		entry = lookupDLaiEntry(ctx, p+1, ailen, &fromAlpha);
 		if (!entry)
 			break;
 
@@ -633,12 +761,10 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	numPathAIs = 0;
 	while (*p) {
 
-		const struct aiEntry* entry = NULL;
+		const struct aiEntry* entry;
 		size_t ailen;
-		ssize_t vallen;
-		const char *outai, *outval;
 		const char *ai;
-		bool fromAlpha = false;
+		bool fromAlpha;
 
 		assert(*p == '/');
 		r = strchr(++p, '/');
@@ -647,98 +773,18 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 		// Process the AI which is known to be valid since we previously walked over it
 		ai = p;
 		ailen = (size_t)(r-p);
-		if (ctx->permitConvenienceAlphas &&
-		    ailen >= 3 && ailen <= 5 &&
-		    !isdigit((int)*p)) {
-			entry = aiEntryFromAlpha(ctx, ai, ailen);
-		}
-		if (entry)
-			fromAlpha = true;
-		else
-			entry = gs1_lookupAIentry(ctx, ai, ailen);
+		entry = lookupDLaiEntry(ctx, ai, ailen, &fromAlpha);
 		assert(entry);
-
-		DEBUG_PRINT("    Extracted AI: (%.*s)\n", (int)ailen, ai);
-
-		// Write out the AI
-		if (fnc1req)
-			writeDataStr("^", 1, &dataStr_len);			// Write FNC1, if required
-		outai = dataStr + dataStr_len;					// Save start of AI for AI data
-		if (fromAlpha)
-			writeDataStr(entry->ai, entry->ailen, &dataStr_len);	// Resolved from convenience alpha
-		else
-			writeDataStr(ai, ailen, &dataStr_len);			// Might be an "unknown AI"
-		fnc1req = entry->fnc1;						// Record if required before next AI
 
 		// Now process the AI value
 		++r;
 		p = r;
 		while (*p && *p != '/') p++;	// Find next '/' or end of string
 
-		if (p == r) {
-			SET_ERR_V(AI_VALUE_PATH_ELEMENT_IS_EMPTY, (int)entry->ailen, ai);
+		if (!parseDLAIvaluePair(ctx, entry, ai, ailen, (size_t)(p-r),
+					fromAlpha, (uint8_t)numPathAIs,
+					&fnc1req, dataStr, &dataStr_len))
 			goto fail;
-		}
-
-		// Save start of value for AI value
-		outval = dataStr + dataStr_len;
-
-		// Reverse percent encoding
-		vallen = URIunescape(dataStr + dataStr_len, MAX_DATA - dataStr_len, r, (size_t)(p-r), false);
-		assert(vallen >= 0);	// URI decoding should not overflow
-		if (vallen == 0) {
-			SET_ERR_V(DECODED_AI_FROM_DL_PATH_INFO_CONTAINS_ILLEGAL_NULL, (int)ailen, ai);
-			goto fail;
-		}
-
-		// Legacy handling of AI (01) to pad up to a GTIN-14, when feature enabled
-		if (ctx->permitZeroSuppressedGTINinDLuris && strcmp(entry->ai, "01") == 0 &&
-		    (vallen == 13 || vallen == 12 || vallen == 8)) {
-			size_t j;
-			char *v = dataStr + dataStr_len;
-			// LCOV_EXCL_START: unreachable while MAX_AIS caps dataStr_len far below MAX_DATA; defence in depth for the unguarded 14-byte write below
-			if (dataStr_len + 14 > MAX_DATA) {
-				SET_ERR_V(DATA_TOO_LONG, MAX_DATA);
-				goto fail;
-			}
-			// LCOV_EXCL_STOP
-			for (j = 0; j <= 13; j++)
-				v[13-j] = vallen >= (ssize_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
-			v[14] = '\0';
-			vallen = 14;
-		}
-
-		// Update dataStr length and NULL terminate
-		dataStr_len += (size_t)vallen;
-		dataStr[dataStr_len] = '\0';
-
-		DEBUG_PRINT("    Extracted value: %.*s\n", (int)vallen, outval);
-
-		// Perform certain checks at parse time, before processing the
-		// components with the linters
-		if (!gs1_aiValLengthContentCheck(ctx, ai, entry, outval, (size_t)vallen))
-			goto fail;
-
-		// Update the AI data
-		// LCOV_EXCL_START: a DL path is constrained to one primary key plus its
-		// key qualifiers (at most a handful of segments in any real GS1 syntax
-		// dictionary), so reaching MAX_AIS via the path alone is not reachable
-		// with valid data. The check is retained as a defence in depth.
-		if (ctx->numAIs >= MAX_AIS) {
-			SET_ERR(TOO_MANY_AIS);
-			goto fail;
-		}
-		// LCOV_EXCL_STOP
-
-		ctx->aiData[ctx->numAIs++] = (struct aiValue) {
-			.kind = aiValue_aival,
-			.aiEntry = entry,
-			.ai = outai,
-			.ailen = (uint8_t)ailen,
-			.value = outval,
-			.vallen = (uint16_t)vallen,
-			.dlPathOrder = (uint8_t)numPathAIs
-		};
 
 		numPathAIs++;
 
@@ -754,10 +800,7 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 
 		const struct aiEntry* entry = NULL;
 		size_t ailen = 0;
-		ssize_t vallen;
-		const char *outai = NULL, *outval, *ai, *e;
-
-		aiValueKind_t kind = alValue_dlign;
+		const char *ai, *e;
 
 		// Process the AI
 		while (*p == '&')				// Jump any & separators
@@ -768,9 +811,7 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 		// Discard parameters with no value
 		if ((e = memchr(p, '=', (size_t)(r-p))) == NULL) {
 			DEBUG_PRINT("    Skipped singleton:   %.*s\n", (int)(r-p), p);
-			outval = p;
-			vallen = (ssize_t)(r-p);
-			goto add_query_param_to_ai_data;	// Undecoded, "non-AI" data value!
+			goto add_ignored_query_param_to_ai_data;	// Undecoded, "non-AI" data value!
 		}
 
 		// Numeric-only query parameters not matching an AI aren't allowed
@@ -784,68 +825,18 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 		// Skip non-numeric query parameters
 		if (!entry) {
 			DEBUG_PRINT("    Skipped:   %.*s\n", (int)(r-p), p);
-			outval = p;
-			vallen = (ssize_t)(r-p);
-			goto add_query_param_to_ai_data;	// Undecoded, "non-AI" data value!
+			goto add_ignored_query_param_to_ai_data;	// Undecoded, "non-AI" data value!
 		}
 
-		DEBUG_PRINT("    Extracted AI: (%.*s)\n", (int)ailen, ai);
-
-		// Write out the AI
-		if (fnc1req)
-			writeDataStr("^", 1, &dataStr_len);		// Write FNC1, if required
-		outai = dataStr + dataStr_len;				// Save start of AI for AI data
-		writeDataStr(ai, ailen, &dataStr_len);			// Might be an "unknown AI"
-		fnc1req = entry->fnc1;					// Record if required before next AI
-
-		// Process the AI value
-		if (r == ++e) {
-			SET_ERR_V(AI_VALUE_QUERY_ELEMENT_IN_EMPTY, (int)entry->ailen, ai);
-			goto fail;
-		}
-
-		// Save start of value for AI data
-		outval = dataStr + dataStr_len;
-
-		// Reverse percent encoding
-		vallen = URIunescape(dataStr + dataStr_len, MAX_DATA - dataStr_len, e, (size_t)(r-e), true);
-		assert(vallen >= 0);	// URI decoding should not overflow
-		if (vallen == 0) {
-			SET_ERR_V(DECODED_AI_VALUE_FROM_QUERY_PARAMS_CONTAINS_ILLEGAL_NULL, (int)entry->ailen, ai);
-			goto fail;
-		}
-
-		// Legacy handling of AI (01) to pad up to a GTIN-14, when feature enabled
-		if (ctx->permitZeroSuppressedGTINinDLuris && strcmp(entry->ai, "01") == 0 &&
-		    (vallen == 13 || vallen == 12 || vallen == 8)) {
-			size_t j;
-			char *v = dataStr + dataStr_len;
-			// LCOV_EXCL_START: unreachable while MAX_AIS caps dataStr_len far below MAX_DATA; defence in depth for the unguarded 14-byte write below
-			if (dataStr_len + 14 > MAX_DATA) {
-				SET_ERR_V(DATA_TOO_LONG, MAX_DATA);
-				goto fail;
-			}
-			// LCOV_EXCL_STOP
-			for (j = 0; j <= 13; j++)
-				v[13-j] = vallen >= (ssize_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
-			v[14] = '\0';
-			vallen = 14;
-		}
-
-		// Update dataStr length and NULL terminate
-		dataStr_len += (size_t)vallen;
-		dataStr[dataStr_len] = '\0';
-
-		DEBUG_PRINT("    Extracted value: %.*s\n", (int)vallen, outval);
-
-		// Perform certain checks at parse time, before processing the
-		// components with the linters
-		if (!gs1_aiValLengthContentCheck(ctx, ai, entry, outval, (size_t)vallen))
+		if (!parseDLAIvaluePair(ctx, entry, ai, ailen, (size_t)(r-e-1),
+					false, DL_PATH_ORDER_ATTRIBUTE,
+					&fnc1req, dataStr, &dataStr_len))
 			goto fail;
 
-		kind = aiValue_aival;
+		p = r;
+		continue;
 
-add_query_param_to_ai_data:
+add_ignored_query_param_to_ai_data:
 
 		if (ctx->numAIs >= MAX_AIS) {
 			SET_ERR(TOO_MANY_AIS);
@@ -853,12 +844,12 @@ add_query_param_to_ai_data:
 		}
 
 		ctx->aiData[ctx->numAIs++] = (struct aiValue) {
-			.kind = kind,
-			.aiEntry = entry,
-			.ai = outai,
+			.kind = alValue_dlign,
+			.aiEntry = NULL,
+			.ai = NULL,
 			.ailen = (uint8_t)ailen,
-			.value = outval,
-			.vallen = (uint16_t)vallen,
+			.value = p,
+			.vallen = (uint16_t)(r-p),
 			.dlPathOrder = DL_PATH_ORDER_ATTRIBUTE
 		};
 
@@ -1866,6 +1857,34 @@ void test_dl_parseDLuri(void) {
 		TEST_MSG("Err: %s", ctx->errMsg);
 		TEST_CHECK(strstr(ctx->errMsg, "Too many AIs") != NULL);
 		TEST_MSG("Expected TOO_MANY_AIS, got: %s", ctx->errMsg);
+	}
+
+
+	/*
+	 *  MAX_AIS boundary via ignored (non-AI) query parameters
+	 *
+	 */
+	{
+		char dlbuf[1024] = {0};
+		char outbuf[1024];
+		char *p;
+		int j;
+
+		p = dlbuf;
+		strcpy(p, "https://a/01/12312312312333?");
+		p += strlen(p);
+		for (j = 0; j < MAX_AIS; j++) {
+			if (j > 0) *p++ = '&';
+			*p++ = 'A' + (char)(j / 26);
+			*p++ = 'A' + (char)(j % 26);
+		}
+		*p = '\0';
+
+		ctx->numAIs = 0;
+		ctx->numSortedAIs = 0;
+		TEST_CHECK(!gs1_parseDLuri(ctx, dlbuf, outbuf));
+		TEST_CHECK(ctx->err == gs1_encoder_eTOO_MANY_AIS);
+		TEST_MSG("Err: %s", ctx->errMsg);
 	}
 
 
