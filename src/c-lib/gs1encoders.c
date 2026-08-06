@@ -396,14 +396,9 @@ bool gs1_encoder_setDataStr(gs1_encoder* const ctx, const char* const dataStr) {
 		if (*ctx->dataStr == '^' && !gs1_processAIdata(ctx, ctx->dataStr, true))
 			goto fail;
 
-		if (ctx->numAIs >= MAX_AIS) {
-			SET_ERR(TOO_MANY_AIS);
-			goto fail;
-		}
-
 		// Indicate separator in HRI
-		ctx->aiData[ctx->numAIs].kind = aiValue_ccsep;
-		ctx->numAIs++;
+		if (!gs1_appendAIvalue(ctx, aiValue_ccsep, NULL, NULL, 0, NULL, 0, DL_PATH_ORDER_ATTRIBUTE))
+			goto fail;
 
 		if (!gs1_processAIdata(ctx, cc + 1, true))
 			goto fail;
@@ -452,11 +447,6 @@ bool gs1_encoder_setAIdataStr(gs1_encoder* const ctx, const char* const aiData) 
 		if (!gs1_parseAIdata(ctx, aiData, ctx->dataStr, MAX_DATA))
 			goto fail;
 
-		if (ctx->numAIs >= MAX_AIS) {
-			SET_ERR(TOO_MANY_AIS);
-			goto fail;
-		}
-
 		p = ctx->dataStr + strlen(ctx->dataStr);
 		// LCOV_EXCL_START: unreachable while MAX_AIS x MAX_AI_VALUE_LEN caps the linear output far below MAX_DATA; defence in depth for the capacity arithmetic below
 		if ((size_t)(p - ctx->dataStr) >= MAX_DATA) {	// No room for separator and composite component
@@ -467,8 +457,8 @@ bool gs1_encoder_setAIdataStr(gs1_encoder* const ctx, const char* const aiData) 
 		*p++ = '|';
 
 		// Indicate separator in HRI
-		ctx->aiData[ctx->numAIs].kind = aiValue_ccsep;
-		ctx->numAIs++;
+		if (!gs1_appendAIvalue(ctx, aiValue_ccsep, NULL, NULL, 0, NULL, 0, DL_PATH_ORDER_ATTRIBUTE))
+			goto fail;
 
 		if (!gs1_parseAIdata(ctx, cc+1, p, MAX_DATA - (size_t)(p - ctx->dataStr)))
 			goto fail;
