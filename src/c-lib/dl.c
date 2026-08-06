@@ -607,20 +607,8 @@ static bool parseDLAIvaluePair(gs1_encoder* const ctx, const struct aiEntry* con
 		goto fail;
 
 	// Update the AI data
-	if (ctx->numAIs >= MAX_AIS) {
-		SET_ERR(TOO_MANY_AIS);
+	if (!gs1_appendAIvalue(ctx, aiValue_aival, entry, outai, (uint8_t)ailen, outval, (uint16_t)vallen, dlPathOrder))
 		goto fail;
-	}
-
-	ctx->aiData[ctx->numAIs++] = (struct aiValue) {
-		.kind = aiValue_aival,
-		.aiEntry = entry,
-		.ai = outai,
-		.ailen = (uint8_t)ailen,
-		.value = outval,
-		.vallen = (uint16_t)vallen,
-		.dlPathOrder = dlPathOrder
-	};
 
 	return true;
 
@@ -838,20 +826,8 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 
 add_ignored_query_param_to_ai_data:
 
-		if (ctx->numAIs >= MAX_AIS) {
-			SET_ERR(TOO_MANY_AIS);
+		if (!gs1_appendAIvalue(ctx, alValue_dlign, NULL, NULL, (uint8_t)ailen, p, (uint16_t)(r-p), DL_PATH_ORDER_ATTRIBUTE))
 			goto fail;
-		}
-
-		ctx->aiData[ctx->numAIs++] = (struct aiValue) {
-			.kind = alValue_dlign,
-			.aiEntry = NULL,
-			.ai = NULL,
-			.ailen = (uint8_t)ailen,
-			.value = p,
-			.vallen = (uint16_t)(r-p),
-			.dlPathOrder = DL_PATH_ORDER_ATTRIBUTE
-		};
 
 		p = r;
 

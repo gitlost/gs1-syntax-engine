@@ -162,6 +162,7 @@ const struct aiEntry* gs1_lookupAIentry(const gs1_encoder *ctx, const char *ai, 
 bool gs1_aiPrefixHasDerivedLength(const char *ai);
 bool existsInAIdata(const gs1_encoder *ctx, const char *ai, size_t ailen, const char *ignoreAI, const struct aiValue **matchedAI);
 bool gs1_aiValLengthContentCheck(gs1_encoder *ctx, const char *ai, const struct aiEntry *entry, const char *aiVal, size_t vallen);
+bool gs1_appendAIvalue(gs1_encoder *ctx, aiValueKind_t kind, const struct aiEntry *entry, const char *ai, uint8_t ailen, const char *value, uint16_t vallen, uint8_t dlPathOrder);
 bool gs1_parseAIdata(gs1_encoder *ctx, const char *aiData, char *dataStr, size_t dataStrCap);
 bool gs1_processAIdata(gs1_encoder *ctx, const char *dataStr, bool extractAIs);
 bool gs1_validateAIs(gs1_encoder* ctx);
