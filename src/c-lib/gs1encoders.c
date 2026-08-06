@@ -625,26 +625,30 @@ int gs1_encoder_getHRI(gs1_encoder* const ctx, char*** const out) {
 }
 
 
-size_t gs1_encoder_getHRIsize(gs1_encoder* const ctx) {
+/*
+ *  Common implementations for sizing and copying the separator-joined string
+ *  lists produced by gs1_encoder_getHRI and gs1_encoder_getDLignoredQueryParams
+ *
+ */
+static size_t stringListSize(gs1_encoder* const ctx, int (*const get)(gs1_encoder*, char***)) {
 
 	size_t sz = 0;
 	int i;
-	char **hri;
-	const int numhri = gs1_encoder_getHRI(ctx, &hri);
+	char **strs;
+	const int num = get(ctx, &strs);
 
-	for (i = 0; i < numhri; i++)
-		sz += strlen(hri[i]) + 1;  // Includes "|" or NULL terminator
+	for (i = 0; i < num; i++)
+		sz += strlen(strs[i]) + 1;  // Includes separator or NULL terminator
 
 	return sz;
 
 }
 
-
-void gs1_encoder_copyHRI(gs1_encoder* const ctx, void* const buf, const size_t max) {
+static void copyStringList(gs1_encoder* const ctx, void* const buf, const size_t max, int (*const get)(gs1_encoder*, char***), const char sep) {
 
 	char *p;
-	char **hri;
-	int i, numhri;
+	char **strs;
+	int i, num;
 	int rem = (int)max;
 
 	assert(ctx);
@@ -653,25 +657,33 @@ void gs1_encoder_copyHRI(gs1_encoder* const ctx, void* const buf, const size_t m
 	if (max == 0)		// No room even for a terminating NUL
 		return;
 
-	numhri = gs1_encoder_getHRI(ctx, &hri);
+	num = get(ctx, &strs);
 
 	p = buf;
-	for (i = 0; i < numhri; i++) {
-		size_t hri_len = strlen(hri[i]);
-		rem -= (int)hri_len + 1;
+	for (i = 0; i < num; i++) {
+		size_t len = strlen(strs[i]);
+		rem -= (int)len + 1;
 		if (rem < 0) {
 			*(char*)buf = '\0';
 			return;
 		}
 		if (i != 0)
-			*p++ = '|';
-		memcpy(p, hri[i], hri_len);
-		p += hri_len;
+			*p++ = sep;
+		memcpy(p, strs[i], len);
+		p += len;
 	}
 	*p = '\0';
 
-	return;
+}
 
+
+size_t gs1_encoder_getHRIsize(gs1_encoder* const ctx) {
+	return stringListSize(ctx, gs1_encoder_getHRI);
+}
+
+
+void gs1_encoder_copyHRI(gs1_encoder* const ctx, void* const buf, const size_t max) {
+	copyStringList(ctx, buf, max, gs1_encoder_getHRI, '|');
 }
 
 
@@ -713,52 +725,12 @@ int gs1_encoder_getDLignoredQueryParams(gs1_encoder* const ctx, char*** const ou
 
 
 size_t gs1_encoder_getDLignoredQueryParamsSize(gs1_encoder* const ctx) {
-
-	size_t sz = 0;
-	int i;
-	char **qp;
-	const int numqp = gs1_encoder_getDLignoredQueryParams(ctx, &qp);
-
-	for (i = 0; i < numqp; i++)
-		sz += strlen(qp[i]) + 1;  // Includes "&" or NULL terminator
-
-	return sz;
-
+	return stringListSize(ctx, gs1_encoder_getDLignoredQueryParams);
 }
 
 
 void gs1_encoder_copyDLignoredQueryParams(gs1_encoder* const ctx, void* const buf, const size_t max) {
-
-	char *p;
-	char **qp;
-	int i, numqp;
-	int rem = (int)max;
-
-	assert(ctx);
-	reset_error(ctx);
-
-	if (max == 0)		// No room even for a terminating NUL
-		return;
-
-	numqp = gs1_encoder_getDLignoredQueryParams(ctx, &qp);
-
-	p = buf;
-	for (i = 0; i < numqp; i++) {
-		size_t qp_len = strlen(qp[i]);
-		rem -= (int)qp_len + 1;
-		if (rem < 0) {
-			*(char*)buf = '\0';
-			return;
-		}
-		if (i != 0)
-			*p++ = '&';
-		memcpy(p, qp[i], qp_len);
-		p += qp_len;
-	}
-	*p = '\0';
-
-	return;
-
+	copyStringList(ctx, buf, max, gs1_encoder_getDLignoredQueryParams, '&');
 }
 
 
