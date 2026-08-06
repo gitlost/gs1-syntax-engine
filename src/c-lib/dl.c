@@ -982,6 +982,44 @@ fail:
 
 
 /*
+ * Emit a URI-escaped AI value pair to the output, as "/AI/value" path info or
+ * an "AI=value&" query parameter.
+ *
+ * Returns false when the output does not fit the remaining available space.
+ *
+ */
+static bool emitDLAIvaluePair(char** const pp, size_t* const avail, const struct aiValue* const ai, const bool isQueryParam) {
+
+	char *p = *pp;
+	const size_t lead = isQueryParam ? 0 : 1;	// Leading "/" of a path element
+	ssize_t len;
+
+	// Need room for the punctuated AI, the escaped value and a trailing NUL or '&'
+	if (*avail < (size_t)ai->ailen + lead + 3)
+		return false;
+
+	len = URIescape(p + lead + ai->ailen + 1, *avail - (size_t)ai->ailen - lead - 2, ai->value, ai->vallen, isQueryParam);
+	if (len < 0)					// Escaped value did not fit
+		return false;
+
+	if (!isQueryParam)
+		*p++ = '/';
+	memcpy(p, ai->ai, ai->ailen);
+	p += ai->ailen;
+	*p++ = isQueryParam ? '=' : '/';
+	p += len;
+	if (isQueryParam)
+		*p++ = '&';
+
+	*avail -= (size_t)ai->ailen + 2 + (size_t)len;
+	*pp = p;
+
+	return true;
+
+}
+
+
+/*
  *  Generate a DL URI from the AI data
  *
  */
@@ -994,7 +1032,6 @@ char* gs1_generateDLuri(gs1_encoder* const ctx, const char* const stem) {
 	char *p;
 	size_t avail;					// Bytes free at p; tracked as we emit
 	bool emitFixed;
-	ssize_t len;
 	const char *stem_to_use;
 	const struct aiValue* pathAIs[MAX_AIS] = { NULL };
 	uint64_t outputAIbitfield[157] = { 0 };		// Track when an AI is emitted
@@ -1174,20 +1211,8 @@ output:
 
 		assert(ai);				// Should not have gaps in the path order
 
-		// Need room for "/AI/", the escaped value and a terminating NUL
-		if (avail < (size_t)ai->ailen + 4)
+		if (!emitDLAIvaluePair(&p, &avail, ai, false))
 			goto too_long;
-
-		len = URIescape(p + 1 + ai->ailen + 1, avail - (size_t)ai->ailen - 3, ai->value, ai->vallen, false);
-		if (len < 0)				// Escaped value did not fit
-			goto too_long;
-
-		*p++ = '/';
-		memcpy(p, ai->ai, ai->ailen);
-		p += ai->ailen;
-		*p++ = '/';
-		p += len;
-		avail -= (size_t)ai->ailen + 2 + (size_t)len;
 
 		GS1_SET_AI_OUTPUT(ai);			// Mark as processed
 	}
@@ -1228,20 +1253,8 @@ again:
 			return NULL;
 		}
 
-		// Need room for "AI=", the escaped value and a trailing '&'
-		if (avail < (size_t)ai->ailen + 3)
+		if (!emitDLAIvaluePair(&p, &avail, ai, true))
 			goto too_long;
-
-		len = URIescape(p + ai->ailen + 1, avail - (size_t)ai->ailen - 2, ai->value, ai->vallen, true);
-		if (len < 0)		// Escaped value did not fit
-			goto too_long;
-
-		memcpy(p, ai->ai, ai->ailen);
-		p += ai->ailen;
-		*p++ = '=';
-		p += len;
-		*p++ = '&';
-		avail -= (size_t)ai->ailen + 2 + (size_t)len;
 
 		GS1_SET_AI_OUTPUT(ai);		// Mark as processed
 
