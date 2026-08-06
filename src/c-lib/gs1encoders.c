@@ -1423,7 +1423,8 @@ void test_api_getters(void) {
 		ctx2 = gs1_encoder_init_ex(NULL, &opts);
 		if (ctx2) {
 			TEST_CHECK(status == GS1_ENCODERS_INIT_SUCCESS);
-			TEST_CHECK(gs1_encoder_setAIdataStr(ctx2, "(01)12312312312333"));
+			strcpy(buf, "(01)12312312312333");
+			TEST_CHECK(gs1_encoder_setAIdataStr(ctx2, buf));
 			gs1_encoder_free(ctx2);
 		}
 
