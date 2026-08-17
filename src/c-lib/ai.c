@@ -648,6 +648,32 @@ bool gs1_aiValLengthContentCheck(gs1_encoder* const ctx, const char* const ai, c
 
 
 /*
+ *  Append an extracted AI value pair to the AI data, enforcing the AI count limit
+ *
+ */
+bool gs1_appendAIvalue(gs1_encoder* const ctx, const aiValueKind_t kind, const struct aiEntry* const entry, const char* const ai, const uint8_t ailen, const char* const value, const uint16_t vallen, const uint8_t dlPathOrder) {
+
+	if (ctx->numAIs >= MAX_AIS) {
+		SET_ERR(TOO_MANY_AIS);
+		return false;
+	}
+
+	ctx->aiData[ctx->numAIs++] = (struct aiValue) {
+		.kind = kind,
+		.aiEntry = entry,
+		.ai = ai,
+		.ailen = ailen,
+		.value = value,
+		.vallen = vallen,
+		.dlPathOrder = dlPathOrder
+	};
+
+	return true;
+
+}
+
+
+/*
  * Convert bracketed AI syntax data to regular AI data string with ^ = FNC1
  *
  */
@@ -716,21 +742,8 @@ again:
 			goto fail;
 
 		// Update the AI data
-		if (ctx->numAIs >= MAX_AIS) {
-			SET_ERR(TOO_MANY_AIS);
+		if (!gs1_appendAIvalue(ctx, aiValue_aival, entry, outai, (uint8_t)ailen, outval, (uint16_t)outval_len, DL_PATH_ORDER_ATTRIBUTE))
 			goto fail;
-		}
-
-		outval_len = dataStr_len - (size_t)(outval - dataStr);
-		ctx->aiData[ctx->numAIs++] = (struct aiValue) {
-			.kind = aiValue_aival,
-			.aiEntry = entry,
-			.ai = outai,
-			.ailen = (uint8_t)ailen,
-			.value = outval,
-			.vallen = (uint16_t)outval_len,
-			.dlPathOrder = DL_PATH_ORDER_ATTRIBUTE
-		};
 
 	}
 
@@ -840,21 +853,9 @@ bool gs1_processAIdata(gs1_encoder* const ctx, const char* const dataStr, const 
 			return false;
 
 		// Add to the aiData
-		if (extractAIs) {
-			if (ctx->numAIs >= MAX_AIS) {
-				SET_ERR(TOO_MANY_AIS);
-				return false;
-			}
-			ctx->aiData[ctx->numAIs++] = (struct aiValue) {
-				.kind = aiValue_aival,
-				.aiEntry = entry,
-				.ai = ai,
-				.ailen = entry->ailen,
-				.value = p,
-				.vallen = (uint16_t)vallen,
-				.dlPathOrder = DL_PATH_ORDER_ATTRIBUTE
-			};
-		}
+		if (extractAIs &&
+		    !gs1_appendAIvalue(ctx, aiValue_aival, entry, ai, entry->ailen, p, (uint16_t)vallen, DL_PATH_ORDER_ATTRIBUTE))
+			return false;
 
 		// After AIs requiring FNC1, we expect to find an FNC1 or be at the end
 		p += vallen;
