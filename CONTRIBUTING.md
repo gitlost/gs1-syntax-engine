@@ -596,6 +596,16 @@ ASAN_OPTIONS="symbolize=1 detect_leaks=1" ./build-fuzzer/gs1encoders-fuzzer-ais 
 
 To regenerate seeds for an existing corpus, delete the corpus directory first.
 
+**OSS-Fuzz**: the same five targets are continuously fuzzed by OSS-Fuzz. The
+build logic lives in `maintenance/ossfuzz/build.sh`; the `google/oss-fuzz`
+integration only delegates to it. That script must not select a compiler or
+add warning flags, since OSS-Fuzz supplies `$CC`, `$CXX`, `$CFLAGS`,
+`$CXXFLAGS` and `$LIB_FUZZING_ENGINE` in order to build each sanitizer and
+fuzzing engine combination itself. It also emits the per-target seed corpus
+zips and the `.options` files that cap generated input at `MAX_DATA+49`, the
+largest length the harnesses accept. See `maintenance/README.md` for how to
+test the integration locally.
+
 **Fuzzer configuration**: Each fuzzer derives a configuration bitmask from the
 input content (polynomial hash) to toggle options such as `permitUnknownAIs`,
 `permitZeroSuppressedGTINinDLuris`, `includeDataTitlesInHRI`, validation
