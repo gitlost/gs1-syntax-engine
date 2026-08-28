@@ -78,7 +78,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	}
 
 	if (len < 1 || len > 512*1024)
-		return -1;
+		return 0;
 
 	/*
 	 *  Load the fuzzed dictionary from memory and install it as the active AI
@@ -89,17 +89,17 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	 */
 	fp = fmemopen((void *)(uintptr_t)buf, len, "r");
 	if (!fp)
-		return -1;
+		return 0;
 	sd = gs1_loadSyntaxDictionaryFromFile(ctx, fp);
 	fclose(fp);
 	if (!sd)
-		return -1;
+		return 0;
 
 	// We reuse one ctx across runs; setAItable is call-once, so release the
 	// key-qualifiers it populated on the previous load before re-invoking it
 	gs1_freeDLkeyQualifiers(ctx);
 	if (!gs1_setAItable(ctx, sd))
-		return -1;
+		return 0;
 
 	/*
 	 *  Per-entry structural invariants: even on hostile input the parser must
