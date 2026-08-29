@@ -64,8 +64,8 @@ how users must structure their applications.
 
 - C code must compile on MSVC, GCC and Clang (including Apple's Clang variant)
 - All C code must compile cleanly with `-Wall -Wextra -Wconversion -Werror -pedantic`
-- The library depends only on ISO C99, which the Makefile enforces with `-std=c99`; POSIX-only interfaces such as `strtok_r`, `strnlen`
-  and `ssize_t` must not be used by the library sources
+- The library depends only on ISO C99, which the Makefile enforces with `-std=c99`; POSIX-only interfaces such as `strtok_r`, `strnlen`,
+  `ssize_t` and `alloca` must not be used by the library sources
 - Use `const` liberally - both for pointer targets and the pointers themselves: `const char* const str`
 - Use Doxygen-style comments for public API functions (`@param`, `@return`, `@note`)
 - Use `size_t` for iterating unbounded memory, otherwise native-width `int` if sufficient; avoid smaller types that may actually reduce performance
@@ -126,10 +126,13 @@ provides `GS1_ENCODERS_CUSTOM_MALLOC`, `GS1_ENCODERS_CUSTOM_CALLOC`,
 the [C API documentation](https://gs1.github.io/gs1-syntax-engine/) for a
 custom heap management example.
 
-**Stack allocation** (`alloca`):
+**Stack allocation**:
 
-- Use only when necessary to avoid large extensions to the context structure or to avoid runtime heap allocation
-- Hoist out of loops to avoid repeated stack growth
+- Use automatic arrays sized from the compile-time implementation limits, with
+  an `assert()` tying the runtime length to the bound
+- Don't use `alloca` or variable-length arrays: they defeat the static stack
+  analysis that embedded integrators rely on, `alloca` has no failure mode, and
+  neither is available on MSVC
 
 ### Performance Patterns
 

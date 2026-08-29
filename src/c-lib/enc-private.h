@@ -39,16 +39,6 @@
 #define MAX_DATA	8191	// Maximum input buffer size
 
 
-#ifdef _MSC_VER
-#include <malloc.h>
-#define alloca _alloca
-#else
-#  if (defined(__GNUC__) && !defined(alloca) && !defined(__NetBSD__)) || defined(__NuttX__) || defined(_AIX) \
-        || (defined(__sun) && defined(__SVR4) /*Solaris*/)
-#    include <alloca.h>				// IWYU pragma: export
-#  endif
-#endif
-
 #if defined(__GNUC__) || defined(__clang__)
 #define __ATTR_CONST __attribute__ ((__const__))
 #define __ATTR_PURE __attribute__ ((__pure__))

@@ -18,8 +18,6 @@
  *
  */
 
-// IWYU pragma: no_include <alloca.h>
-
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -382,15 +380,14 @@ static __ATTR_PURE int compareDLKeyQualifier(const void* const key, const void* 
 static int getDLpathAIseqEntry(const gs1_encoder* const ctx, const char (*ais)[MAX_AI_LEN+1], const int len) {
 
 	const size_t bufsize = (size_t)len * (MAX_AI_LEN + 1);
-	char* aiseq;
+	char aiseq[MAX_AIS * (MAX_AI_LEN + 1)];
 	char *p;
 	int i;
 	ptrdiff_t index;
 
 	assert(len >= 1);
+	assert(bufsize <= sizeof(aiseq));
 
-	// cppcheck-suppress allocaCalled
-	aiseq = alloca(bufsize);
 	p = aiseq;
 
 	/*
@@ -634,7 +631,7 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	char* dp = NULL;	// DL path info
 	bool ret;
 	bool fnc1req = true;
-	char (*pathAIseq)[MAX_AI_LEN+1];
+	char pathAIseq[MAX_AIS][MAX_AI_LEN+1] = {{0}};
 	int numPathAIs;
 	int i;
 	size_t dataStr_len = 0;
@@ -845,8 +842,7 @@ add_ignored_query_param_to_ai_data:
 	 *  key-qualifier association
 	 *
 	 */
-	// cppcheck-suppress allocaCalled
-	pathAIseq = alloca((size_t)numPathAIs * sizeof(*pathAIseq));
+	assert(numPathAIs <= (int)SIZEOF_ARRAY(pathAIseq));
 	for (i = 0; i < numPathAIs; i++) {
 
 		const struct aiValue* ai = &ctx->aiData[i];
@@ -866,8 +862,9 @@ add_ignored_query_param_to_ai_data:
 	// instead belong within path info
 	if (numPathAIs < MAX_AIS) {
 		int k;
-		// cppcheck-suppress allocaCalled
-		char (*seq)[MAX_AI_LEN+1] = alloca((size_t)(numPathAIs + 1) * sizeof(*seq));
+		char seq[MAX_AIS + 1][MAX_AI_LEN+1] = {{0}};
+
+		assert(numPathAIs + 1 <= (int)SIZEOF_ARRAY(seq));
 
 		// Sort AIs to enable O(n) duplicate check
 		gs1_sortAIs(ctx);
@@ -2138,6 +2135,7 @@ void test_dl_testValidateDLpathAIseq(void) {
 			n = snprintf(p, sizeof(casename) - (size_t)(p - casename), "%s ", seq[i][num]);
 			assert(n >= 0 || n < (int)(sizeof(casename) - (size_t)(p - casename)));
 		}
+		assert(num > 0);		// Every case has at least one AI
 		*(p-1) = '\0';
 		TEST_CASE(casename);
 
