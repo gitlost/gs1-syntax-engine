@@ -208,6 +208,15 @@ endif
 PREFIX = /usr/local
 LIBDIR = $(PREFIX)/lib
 
+# ldconfig refreshes the shared library cache of the running system, which is
+# meaningless for a staged install and unavailable other than on Linux
+LDCONFIG = :
+ifeq ($(ARCH_OS), linux)
+ifeq ($(DESTDIR),)
+LDCONFIG = ldconfig
+endif
+endif
+
 EXAMPLE_SRC = example.c
 EXAMPLE_BIN = $(BUILD_DIR)/$(NAME)-example.$(BIN_SUFFIX)
 
@@ -559,7 +568,7 @@ clean-wasm:
 .PHONY: install
 install: install-static install-shared
 
-.PHONY: .install-headers
+.PHONY: install-headers
 install-headers:
 	install -d $(DESTDIR)$(PREFIX)/include
 	install -m 0644 $(NAME).h   $(DESTDIR)$(PREFIX)/include
@@ -574,16 +583,19 @@ install-static: libstatic install-headers
 install-shared: libshared install-headers
 	install -d $(DESTDIR)$(LIBDIR)
 	install -m 0644 $(BUILD_DIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)
-	-ldconfig
+	ln -sf lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(MAJOR)
+	ln -sf lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX)
+	-$(LDCONFIG)
 
 .PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/include/$(NAME).h
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION)
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX).$(MAJOR)
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX)
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_STATIC_SUFFIX)
-	-ldconfig
+	$(RM) $(DESTDIR)$(PREFIX)/include/$(NAME).hpp
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION)
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(MAJOR)
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX)
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_STATIC_SUFFIX)
+	-$(LDCONFIG)
 
 .PHONY: docs-clib
 docs-clib:
