@@ -87,7 +87,7 @@ Choose your API</h2>
 <div class="line">printf(<span class="stringliteral">&quot;%s\n&quot;</span>, <a class="code hl_function" href="group__capi.html#gaf95b1858f07e4c2cd872705cab9d4b29">gs1_encoder_getDLuri</a>(gs, <span class="stringliteral">&quot;https://example.com&quot;</span>));</div>
 <div class="line"><a class="code hl_function" href="group__capi.html#ga0078a51318ba3551052c309fe48110ae">gs1_encoder_free</a>(gs);</div>
 <div class="ttc" id="agroup__capi_html_ga0078a51318ba3551052c309fe48110ae"><div class="ttname"><a href="group__capi.html#ga0078a51318ba3551052c309fe48110ae">gs1_encoder_free</a></div><div class="ttdeci">GS1_ENCODERS_API void gs1_encoder_free(gs1_encoder *ctx)</div><div class="ttdoc">Destroy a gs1_encoder instance.</div></div>
-<div class="ttc" id="agroup__capi_html_ga34f786d8479759fd8894c6d22a9f5c34"><div class="ttname"><a href="group__capi.html#ga34f786d8479759fd8894c6d22a9f5c34">gs1_encoder</a></div><div class="ttdeci">struct gs1_encoder gs1_encoder</div><div class="ttdoc">A gs1_encoder context.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:226</div></div>
+<div class="ttc" id="agroup__capi_html_ga34f786d8479759fd8894c6d22a9f5c34"><div class="ttname"><a href="group__capi.html#ga34f786d8479759fd8894c6d22a9f5c34">gs1_encoder</a></div><div class="ttdeci">struct gs1_encoder gs1_encoder</div><div class="ttdoc">A gs1_encoder context.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:247</div></div>
 <div class="ttc" id="agroup__capi_html_gabdce5a9347ff7cbbd153b1a13e3273dd"><div class="ttname"><a href="group__capi.html#gabdce5a9347ff7cbbd153b1a13e3273dd">gs1_encoder_setAIdataStr</a></div><div class="ttdeci">GS1_ENCODERS_API bool gs1_encoder_setAIdataStr(gs1_encoder *ctx, const char *dataStr)</div><div class="ttdoc">Sets the data in the buffer that is used when buffer input is selected by parsing input provided in G...</div></div>
 <div class="ttc" id="agroup__capi_html_gaf3a0f85afa4d367a1bca6875864e3a6d"><div class="ttname"><a href="group__capi.html#gaf3a0f85afa4d367a1bca6875864e3a6d">gs1_encoder_init_ex</a></div><div class="ttdeci">GS1_ENCODERS_API gs1_encoder * gs1_encoder_init_ex(void *mem, const gs1_encoder_init_opts_t *opts)</div><div class="ttdoc">Initialise a new gs1_encoder context with the extended interface.</div></div>
 <div class="ttc" id="agroup__capi_html_gaf95b1858f07e4c2cd872705cab9d4b29"><div class="ttname"><a href="group__capi.html#gaf95b1858f07e4c2cd872705cab9d4b29">gs1_encoder_getDLuri</a></div><div class="ttdeci">GS1_ENCODERS_API char * gs1_encoder_getDLuri(gs1_encoder *ctx, const char *stem)</div><div class="ttdoc">Returns a GS1 Digital Link URI representing AI-based input data.</div></div>
@@ -110,6 +110,12 @@ Building the C library</h3>
 <p>Build using Visual Studio or from a Developer Command Prompt: </p><pre class="fragment">msbuild src\gs1encoders.sln /t:gs1encoders /p:Configuration=Release /p:Platform=x64
 </pre><p> This generates the library in <code>src\c-lib\build\library\x64\Release\gs1encoders.dll</code>.</p>
 <h3><a class="anchor" id="autotoc_md2"></a>
+Installing the library</h3>
+<p><b>On Unix/macOS:</b> </p><pre class="fragment">make -C src/c-lib install
+</pre><p> This installs the shared and static libraries, the <code><a class="el" href="gs1encoders_8h.html">gs1encoders.h</a></code> and <code><a class="el" href="gs1encoders_8hpp.html">gs1encoders.hpp</a></code> headers, and a <code>pkg-config</code> file. Set <code>PREFIX</code> (default <code>/usr/local</code>), <code>LIBDIR</code> and <code>DESTDIR</code> as required.</p>
+<p>Applications then obtain their compiler and linker flags without hard-coding any paths: </p><pre class="fragment">cc myapp.c `pkg-config --cflags --libs gs1encoders` -o myapp
+</pre><p> The <code>pkg-config</code> file also carries the library version, so a build can require a minimum release: </p><pre class="fragment">pkg-config --atleast-version=1.4.1 gs1encoders
+</pre> <h3><a class="anchor" id="autotoc_md3"></a>
 Running the examples</h3>
 <p>After building, you can exercise the library in two ways: a non-interactive <b>C</b> program that walks through the API (<code>example.c</code>), and an interactive <b>C++</b> console application (<code>gs1encoders-cpp-app.cpp</code>) that provides a menu for testing different input formats and features.</p>
 <p><b>On Unix/macOS:</b></p>
@@ -121,7 +127,7 @@ LD_LIBRARY_PATH=src/c-lib/build src/c-lib/build/gs1encoders-cpp-app.bin
 <p>The C++ console application is built as part of the solution: </p><pre class="fragment">msbuild src\gs1encoders.sln /t:gs1encoders-cpp-app /p:Configuration=Release /p:Platform=x64
 src\c-lib\build\console-app-cpp\x64\Release\gs1encoders-cpp-app.exe
 </pre><p> The C example has no Visual Studio project; compile it directly against the library as shown in the <em>Using in your own C/C++ project</em> section below.</p>
-<h3><a class="anchor" id="autotoc_md3"></a>
+<h3><a class="anchor" id="autotoc_md4"></a>
 Using in your own C/C++ project</h3>
 <p>To use the library in your C/C++ project you must:</p>
 <ol type="1">
@@ -225,13 +231,13 @@ Using in your own C/C++ project</h3>
 <div class="line">    <span class="keywordflow">return</span> 0;</div>
 <div class="line">}</div>
 <div class="ttc" id="agroup__capi_html_ga14e77e67dec91eb4ed3b711fcd932a73"><div class="ttname"><a href="group__capi.html#ga14e77e67dec91eb4ed3b711fcd932a73">gs1_encoder_getAIdataStr</a></div><div class="ttdeci">GS1_ENCODERS_API char * gs1_encoder_getAIdataStr(gs1_encoder *ctx)</div><div class="ttdoc">Return the barcode input data buffer in human-friendly AI syntax.</div></div>
-<div class="ttc" id="agroup__capi_html_ga5c607c7299d2fa84c0c5dccbf3a7a638"><div class="ttname"><a href="group__capi.html#ga5c607c7299d2fa84c0c5dccbf3a7a638">gs1_encoder_init_status_t</a></div><div class="ttdeci">enum gs1_encoder_init_status gs1_encoder_init_status_t</div><div class="ttdoc">Equivalent to the enum gs1_encoder_init_status type.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:172</div></div>
+<div class="ttc" id="agroup__capi_html_ga5c607c7299d2fa84c0c5dccbf3a7a638"><div class="ttname"><a href="group__capi.html#ga5c607c7299d2fa84c0c5dccbf3a7a638">gs1_encoder_init_status_t</a></div><div class="ttdeci">enum gs1_encoder_init_status gs1_encoder_init_status_t</div><div class="ttdoc">Equivalent to the enum gs1_encoder_init_status type.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:193</div></div>
 <div class="ttc" id="agroup__capi_html_ga6325f0f12c0a2110939b876aefbdd1d1"><div class="ttname"><a href="group__capi.html#ga6325f0f12c0a2110939b876aefbdd1d1">gs1_encoder_setDataStr</a></div><div class="ttdeci">GS1_ENCODERS_API bool gs1_encoder_setDataStr(gs1_encoder *ctx, const char *dataStr)</div><div class="ttdoc">Sets the raw data that would be directly encoded within a GS1 barcode message.</div></div>
-<div class="ttc" id="agroup__capi_html_gae34970304bbc7ade783dcaa879f840b4"><div class="ttname"><a href="group__capi.html#gae34970304bbc7ade783dcaa879f840b4">gs1_encoder_init_opts_t</a></div><div class="ttdeci">struct gs1_encoder_init_opts gs1_encoder_init_opts_t</div><div class="ttdoc">Equivalent to the struct gs1_encoder_init_opts type.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:194</div></div>
-<div class="ttc" id="agroup__capi_html_ggac7c463156739caaa586975a67b70accca70b833a817df39c0c8a876544d5e86be"><div class="ttname"><a href="group__capi.html#ggac7c463156739caaa586975a67b70accca70b833a817df39c0c8a876544d5e86be">gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR</a></div><div class="ttdeci">@ gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR</div><div class="ttdoc">Fallback to the embedded AI table (if not disabled and is compiled in) when loading the explicit gs1_...</div><div class="ttdef"><b>Definition</b> gs1encoders.h:145</div></div>
-<div class="ttc" id="agroup__capi_html_ggad52da08e73fd856764be330398ea931aaf7013eb35a5dc034ff5c172550664c07"><div class="ttname"><a href="group__capi.html#ggad52da08e73fd856764be330398ea931aaf7013eb35a5dc034ff5c172550664c07">GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE</a></div><div class="ttdeci">@ GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE</div><div class="ttdoc">The explicit gs1_encoder_init_opts::syntaxDictionary could not be loaded (e.g. file not found or pars...</div><div class="ttdef"><b>Definition</b> gs1encoders.h:160</div></div>
-<div class="ttc" id="astructgs1__encoder__init__opts_html"><div class="ttname"><a href="structgs1__encoder__init__opts.html">gs1_encoder_init_opts</a></div><div class="ttdoc">Initialisation options structure for gs1_encoder_init_ex().</div><div class="ttdef"><b>Definition</b> gs1encoders.h:180</div></div>
-<div class="ttc" id="astructgs1__encoder__init__opts_html_a2c89c52b8e569f43c4e85676261c68ff"><div class="ttname"><a href="structgs1__encoder__init__opts.html#a2c89c52b8e569f43c4e85676261c68ff">gs1_encoder_init_opts::struct_size</a></div><div class="ttdeci">size_t struct_size</div><div class="ttdoc">Must be initialised to sizeof(gs1_encoder_init_opts_t)</div><div class="ttdef"><b>Definition</b> gs1encoders.h:181</div></div>
+<div class="ttc" id="agroup__capi_html_gae34970304bbc7ade783dcaa879f840b4"><div class="ttname"><a href="group__capi.html#gae34970304bbc7ade783dcaa879f840b4">gs1_encoder_init_opts_t</a></div><div class="ttdeci">struct gs1_encoder_init_opts gs1_encoder_init_opts_t</div><div class="ttdoc">Equivalent to the struct gs1_encoder_init_opts type.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:215</div></div>
+<div class="ttc" id="agroup__capi_html_ggac7c463156739caaa586975a67b70accca70b833a817df39c0c8a876544d5e86be"><div class="ttname"><a href="group__capi.html#ggac7c463156739caaa586975a67b70accca70b833a817df39c0c8a876544d5e86be">gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR</a></div><div class="ttdeci">@ gs1_encoder_iFALLBACK_ON_SYNDICT_ERROR</div><div class="ttdoc">Fallback to the embedded AI table (if not disabled and is compiled in) when loading the explicit gs1_...</div><div class="ttdef"><b>Definition</b> gs1encoders.h:166</div></div>
+<div class="ttc" id="agroup__capi_html_ggad52da08e73fd856764be330398ea931aaf7013eb35a5dc034ff5c172550664c07"><div class="ttname"><a href="group__capi.html#ggad52da08e73fd856764be330398ea931aaf7013eb35a5dc034ff5c172550664c07">GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE</a></div><div class="ttdeci">@ GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE</div><div class="ttdoc">The explicit gs1_encoder_init_opts::syntaxDictionary could not be loaded (e.g. file not found or pars...</div><div class="ttdef"><b>Definition</b> gs1encoders.h:181</div></div>
+<div class="ttc" id="astructgs1__encoder__init__opts_html"><div class="ttname"><a href="structgs1__encoder__init__opts.html">gs1_encoder_init_opts</a></div><div class="ttdoc">Initialisation options structure for gs1_encoder_init_ex().</div><div class="ttdef"><b>Definition</b> gs1encoders.h:201</div></div>
+<div class="ttc" id="astructgs1__encoder__init__opts_html_a2c89c52b8e569f43c4e85676261c68ff"><div class="ttname"><a href="structgs1__encoder__init__opts.html#a2c89c52b8e569f43c4e85676261c68ff">gs1_encoder_init_opts::struct_size</a></div><div class="ttdeci">size_t struct_size</div><div class="ttdoc">Must be initialised to sizeof(gs1_encoder_init_opts_t)</div><div class="ttdef"><b>Definition</b> gs1encoders.h:202</div></div>
 </div><!-- fragment --><p><b>C++</b> (<code>myapp.cpp</code>):</p>
 <p>In the wrapper, initialisation failures throw a <a class="el" href="classgs1encoders_1_1GS1EncoderGeneralException.html" title="Thrown to indicate a general problem initialising the library, such as when the underlying AI table c...">gs1encoders::GS1EncoderGeneralException</a> (whose <code>.what()</code> carries the underlying error message); on success, <a class="el" href="classgs1encoders_1_1GS1Encoder.html#acbc9edb4b90c5b4b43e9a622b64556ce" title="The warning message produced when initialisation fell back to the embedded AI table because the suppl...">gs1encoders::GS1Encoder::init_fallback_warning()</a> returns the load-error message if the embedded AI table was used as a fallback, or <code>std::nullopt</code> on plain success. The native context is freed when the encoder object goes out of scope, so no manual cleanup is required.</p>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &lt;iostream&gt;</span></div>
@@ -280,7 +286,7 @@ Example Uses</h2>
 <dd>
 Error message strings are provided in the English language in a single file that can be replaced at compile time.</dd></dl>
 <p>Refer to the bundled examples — the C program <code>example.c</code> and the interactive C++ console application <code>gs1encoders-cpp-app.cpp</code> — for complete, working demonstrations of how to use this library.</p>
-<h3><a class="anchor" id="autotoc_md4"></a>
+<h3><a class="anchor" id="autotoc_md5"></a>
 GS1 AI data validation and extraction (including GS1 Digital Link)</h3>
 <p>The following code processes AI data input, validates it (reporting any failures) and displays the extracted AIs if the validation succeeds.</p>
 <p><b>C:</b></p>
@@ -355,7 +361,7 @@ GS1 AI data validation and extraction (including GS1 Digital Link)</h3>
 <div class="line">    std::cout &lt;&lt; line &lt;&lt; <span class="stringliteral">&quot;\n&quot;</span>;</div>
 <div class="line">}</div>
 <div class="ttc" id="aclassgs1encoders_1_1GS1Encoder_html_a04a7417753371207db2106814945a0c1"><div class="ttname"><a href="classgs1encoders_1_1GS1Encoder.html#a04a7417753371207db2106814945a0c1">gs1encoders::GS1Encoder::err_markup</a></div><div class="ttdeci">std::string err_markup() const</div><div class="ttdoc">Get the marked-up offending AI from the most recent linting failure.</div><div class="ttdef"><b>Definition</b> gs1encoders.hpp:884</div></div>
-</div><!-- fragment --><h3><a class="anchor" id="autotoc_md5"></a>
+</div><!-- fragment --><h3><a class="anchor" id="autotoc_md6"></a>
 Converting an AI element string to barcode message data</h3>
 <p>In this example we process a bracketed AI element string to convert it into barcode message data, suitable for carrying in a GS1 barcode symbol.</p>
 <p><b>C:</b></p>
@@ -395,7 +401,7 @@ Converting an AI element string to barcode message data</h3>
 Additionally, barcode image encoder libraries have differing conventions for how to input FNC1 characters, extending to whether it is necessary to be explicit about the notional FNC1 character in the first position when specifying a GS1 Application Identifier syntax symbol. </dd>
 <dd>
 Consequently, the barcode message data emitted by this library may need to be post-processed to align to the specific requirements of whatever symbol generation library is in use.</dd></dl>
-<h3><a class="anchor" id="autotoc_md6"></a>
+<h3><a class="anchor" id="autotoc_md7"></a>
 Barcode scan data processing</h3>
 <p>In this example we process scan data from a barcode reader to extract the AI data.</p>
 <p><b>C:</b></p>
@@ -425,7 +431,7 @@ Barcode scan data processing</h3>
 <div class="line"><a class="code hl_function" href="group__capi.html#ga0078a51318ba3551052c309fe48110ae">gs1_encoder_free</a>(ctx);</div>
 <div class="ttc" id="agroup__capi_html_gaa946d38ee07b2d0347bddbfb36fbb0c8"><div class="ttname"><a href="group__capi.html#gaa946d38ee07b2d0347bddbfb36fbb0c8">gs1_encoder_setValidationEnabled</a></div><div class="ttdeci">GS1_ENCODERS_API bool gs1_encoder_setValidationEnabled(gs1_encoder *ctx, gs1_encoder_validations_t validation, bool enabled)</div><div class="ttdoc">Enable or disable the given AI validation procedure of type gs1_encoder_validations,...</div></div>
 <div class="ttc" id="agroup__capi_html_gac137de565a438241f6e8b80598cef464"><div class="ttname"><a href="group__capi.html#gac137de565a438241f6e8b80598cef464">gs1_encoder_setScanData</a></div><div class="ttdeci">GS1_ENCODERS_API bool gs1_encoder_setScanData(gs1_encoder *ctx, const char *scanData)</div><div class="ttdoc">Process normalised scan data received from a barcode reader with reporting of AIM symbology identifie...</div></div>
-<div class="ttc" id="agroup__capi_html_gga11a47c2b410ffcc87a332c973cce85c9a2a5f772fde717a4f68593eeb592d54c6"><div class="ttname"><a href="group__capi.html#gga11a47c2b410ffcc87a332c973cce85c9a2a5f772fde717a4f68593eeb592d54c6">gs1_encoder_vREQUISITE_AIS</a></div><div class="ttdeci">@ gs1_encoder_vREQUISITE_AIS</div><div class="ttdoc">Default: Enabled. Validates that the input satisfies the mandatory associations for each AI.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:125</div></div>
+<div class="ttc" id="agroup__capi_html_gga11a47c2b410ffcc87a332c973cce85c9a2a5f772fde717a4f68593eeb592d54c6"><div class="ttname"><a href="group__capi.html#gga11a47c2b410ffcc87a332c973cce85c9a2a5f772fde717a4f68593eeb592d54c6">gs1_encoder_vREQUISITE_AIS</a></div><div class="ttdeci">@ gs1_encoder_vREQUISITE_AIS</div><div class="ttdoc">Default: Enabled. Validates that the input satisfies the mandatory associations for each AI.</div><div class="ttdef"><b>Definition</b> gs1encoders.h:146</div></div>
 </div><!-- fragment --><p><b>C++:</b></p>
 <div class="fragment"><div class="line"><a class="code hl_class" href="classgs1encoders_1_1GS1Encoder.html">gs1encoders::GS1Encoder</a> gs;</div>
 <div class="line"> </div>
@@ -452,14 +458,15 @@ Barcode scan data processing</h3>
 </div><!-- fragment --><dl class="section note"><dt>Note</dt><dd>It is required that AIM Symbology Identifiers are enabled on the barcode reader.</dd>
 <dd>
 It is assumed the scanned barcode message "survives the channel" intact, i.e. that no character substitutions have been made by the reader, in particular that any embedded FNC1 separator characters are correctly represented by GS characters (ASCII 29). If this is not the case then the scanned data should be pre-processed to meet this requirement.</dd></dl>
-<h2><a class="anchor" id="autotoc_md7"></a>
+<h2><a class="anchor" id="autotoc_md8"></a>
 Compile-Time Configuration Macros</h2>
-<p>The following macros may be defined at compile time to enable or disable optional features:</p>
-<p><code>GS1_ENCODERS_ERR_LANG=&lt;LANG&gt;</code> : Used to specify alternative translation strings for error messages. Create a new header file named <code>tr_&lt;LANG&gt;.h</code> based on the existing <code>tr_EN.h</code> file.</p>
+<p>The following macros may be defined at compile time to enable or disable optional features. When building with the supplied Makefile they are passed via <code>EXTRA_CFLAGS</code>, for example:</p>
+<div class="fragment"><div class="line">make lib EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER</div>
+</div><!-- fragment --><p><code>GS1_ENCODERS_ERR_LANG=&lt;LANG&gt;</code> : Used to specify alternative translation strings for error messages. Create a new header file named <code>tr_&lt;LANG&gt;.h</code> based on the existing <code>tr_EN.h</code> file.</p>
 <p><code>EXCLUDE_EMBEDDED_AI_TABLE</code> : Excludes the embedding a table of AI properties in order to reduce the size of the library. The table of AI definitions must be populated by parsing from the GS1 Syntax Dictionary instead, without falling back to the embedded instance.</p>
 <p><code>EXCLUDE_SYNTAX_DICTIONARY_LOADER</code> : Excludes functions for populating the table of AIs by parsing the GS1 Syntax Dictionary. The AI definitions must be embedded for the library to function, i.e. this option is mutually exclusive of <code>EXCLUDE_EMBEDDED_AI_TABLE</code>.</p>
 <p><code>GS1_ENCODERS_CUSTOM_HEAP_MANAGEMENT_H=&lt;CUSTOM_HEADER.h&gt;</code> : Points to a file that declares alternative heap management routines via the <code>GS1_ENCODERS_CUSTOM_MALLOC</code>, <code>GS1_ENCODERS_CUSTOM_CALLOC</code>, <code>GS1_ENCODERS_CUSTOM_REALLOC</code> and <code>GS1_ENCODERS_CUSTOM_FREE</code> macros. See below for implementation details.</p>
-<h3><a class="anchor" id="autotoc_md8"></a>
+<h3><a class="anchor" id="autotoc_md9"></a>
 Custom heap management routines example</h3>
 <p>Define <code>GS1_ENCODERS_CUSTOM_HEAP_MANAGEMENT_H=my_alloc.h</code>.</p>
 <p>Example declarations in <code>my_alloc.h</code>:</p>
