@@ -964,6 +964,8 @@ DIAG_POP
  *  the deprecated enumerators have been removed; do not delete them.
  *
  */
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
+
 void test_api_init_deprecatedFlags(void) {
 
 DIAG_PUSH
@@ -1011,6 +1013,8 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 DIAG_POP
 
 }
+
+#endif  /* EXCLUDE_EMBEDDED_AI_TABLE */
 
 
 void test_api_init_opts_layout(void) {
@@ -1344,6 +1348,7 @@ void test_api_getters(void) {
 	 *  gs1_encoder_init_ex with opts
 	 *
 	 */
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
 	{
 		gs1_encoder *ctx2;
 		gs1_encoder_init_status_t status;
@@ -1390,6 +1395,7 @@ void test_api_getters(void) {
 			gs1_encoder_free(ctx2);
 		}
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 		/* syntaxDictionary: nonexistent file, must fail without fallback */
 		opts.flags = gs1_encoder_iDEFAULT;
 		opts.syntaxDictionary = "nonexistent-file.txt";
@@ -1406,6 +1412,7 @@ void test_api_getters(void) {
 		TEST_CHECK(status == GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE);
 		TEST_CHECK(msgBuf[0] != '\0');		// errMsg surfaced via msgBuf
 		gs1_encoder_free(ctx2);
+#endif
 
 		/* iFALLBACK_ON_SYNDICT_ERROR + iNO_EMBEDDED + bad path: fallback target is
 		   disabled, so init must fail with NO_EMBEDDED_TABLE rather than fall back */
@@ -1429,7 +1436,9 @@ void test_api_getters(void) {
 		gs1_encoder_free(ctx2);
 		opts.struct_size = sizeof(gs1_encoder_init_opts_t);
 	}
+#endif  /* EXCLUDE_EMBEDDED_AI_TABLE */
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 	/*
 	 *  msgBuf truncation: when msgBufSize is smaller than the error
 	 *  string, the buffer must still be NUL-terminated and not overrun.
@@ -1472,6 +1481,7 @@ void test_api_getters(void) {
 		ctx2 = gs1_encoder_init_ex(NULL, &opts);
 		TEST_CHECK(ctx2 == NULL);
 	}
+#endif
 
 	/*
 	 *  gs1_encoder_setValidationEnabled: invalid enum
@@ -2233,6 +2243,8 @@ void test_api_allocFailures(void) {
 }
 
 
+#if !defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER) && !defined(EXCLUDE_EMBEDDED_AI_TABLE)
+
 void test_api_brokenPrefixSyndict(void) {
 
 	const char* const path = "test-syndict-broken-prefix.txt";
@@ -2302,6 +2314,8 @@ void test_api_tooManyDLkeyQualifiersSyndict(void) {
 	remove(path);
 
 }
+
+#endif  /* Syntax Dictionary fallback to the embedded AI table */
 
 
 #endif  /* UNIT_TESTS */

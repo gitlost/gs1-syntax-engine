@@ -411,7 +411,9 @@ ssize_t gs1_binarySearch(const void* needle, const void* haystack, const size_t 
 void test_api_getVersion(void);
 void test_api_instanceSize(void);
 void test_api_init(void);
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
 void test_api_init_deprecatedFlags(void);
+#endif
 void test_api_init_opts_layout(void);
 void test_api_init_enum_values(void);
 void test_api_defaults(void);
@@ -431,7 +433,7 @@ void test_api_copyHRI(void);
 void test_api_getDLignoredQueryParams(void);
 void test_api_copyDLignoredQueryParams(void);
 void test_api_allocFailures(void);
-#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+#if !defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER) && !defined(EXCLUDE_EMBEDDED_AI_TABLE)
 void test_api_brokenPrefixSyndict(void);
 void test_api_tooManyDLkeyQualifiersSyndict(void);
 #endif

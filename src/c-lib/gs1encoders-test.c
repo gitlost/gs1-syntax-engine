@@ -59,7 +59,9 @@ TEST_LIST = {
     { "api_getVersion", test_api_getVersion },
     { "api_instanceSize", test_api_instanceSize },
     { "api_init", test_api_init },
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
     { "api_init_deprecatedFlags", test_api_init_deprecatedFlags },
+#endif
     { "api_init_opts_layout", test_api_init_opts_layout },
     { "api_init_enum_values", test_api_init_enum_values },
     { "api_defaults", test_api_defaults },
@@ -79,7 +81,7 @@ TEST_LIST = {
     { "api_getDLignoredQueryParams", test_api_getDLignoredQueryParams },
     { "api_copyDLignoredQueryParams", test_api_copyDLignoredQueryParams },
     { "api_allocFailures", test_api_allocFailures },
-#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+#if !defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER) && !defined(EXCLUDE_EMBEDDED_AI_TABLE)
     { "api_brokenPrefixSyndict", test_api_brokenPrefixSyndict },
     { "api_tooManyDLkeyQualifiersSyndict", test_api_tooManyDLkeyQualifiersSyndict },
 #endif
@@ -116,7 +118,9 @@ TEST_LIST = {
     { "ai_linters", test_ai_linters },
     { "ai_errMarkup", test_ai_errMarkup },
     { "ai_gs1_processAIdata", test_ai_processAIdata },
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
     { "ai_predefinedLength", test_ai_predefinedLength },
+#endif
     { "ai_validateAIs", test_ai_validateAIs },
 
 
@@ -130,7 +134,9 @@ TEST_LIST = {
     { "dl_URIescape", test_dl_URIescape },
     { "dl_generateDLuri", test_dl_generateDLuri },
     { "dl_allocFailures", test_dl_allocFailures },
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
     { "dl_keyQualifierLimit", test_dl_keyQualifierLimit },
+#endif
 
 
     /*

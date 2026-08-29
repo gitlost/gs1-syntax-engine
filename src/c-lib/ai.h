@@ -181,7 +181,9 @@ void test_ai_parseAIdata(void);
 void test_ai_linters(void);
 void test_ai_errMarkup(void);
 void test_ai_processAIdata(void);
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 void test_ai_predefinedLength(void);
+#endif
 void test_ai_validateAIs(void);
 void test_ai_lint_csumalpha(void);
 

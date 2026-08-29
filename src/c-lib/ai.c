@@ -1952,6 +1952,8 @@ static void do_test_validateAIs(gs1_encoder* const ctx, const char* const file, 
 
 }
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+
 void test_ai_predefinedLength(void) {
 
 	const char* const path = "test-ai-predefined.txt";
@@ -2081,6 +2083,8 @@ void test_ai_predefinedLength(void) {
 	remove(path);
 
 }
+
+#endif  /* EXCLUDE_SYNTAX_DICTIONARY_LOADER */
 
 void test_ai_validateAIs(void) {
 

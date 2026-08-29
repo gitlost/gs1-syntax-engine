@@ -2409,6 +2409,8 @@ void test_dl_allocFailures(void) {
 }
 
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+
 void test_dl_keyQualifierLimit(void) {
 
 	const char* const path = "test-syndict-dlpkey.txt";
@@ -2428,6 +2430,7 @@ void test_dl_keyQualifierLimit(void) {
 		gs1_encoder_free(ctx);
 	}
 
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
 	// One qualifier over the cap is rejected (no 2^n blow-up): load falls back
 	// to the embedded table, so the custom AI is no longer known
 	fp = fopen(path, "wb");
@@ -2442,10 +2445,13 @@ void test_dl_keyQualifierLimit(void) {
 		TEST_CHECK(ctx->err == gs1_encoder_eAI_UNRECOGNISED);
 		gs1_encoder_free(ctx);
 	}
+#endif  /* EXCLUDE_EMBEDDED_AI_TABLE */
 
 	remove(path);
 
 }
+
+#endif  /* EXCLUDE_SYNTAX_DICTIONARY_LOADER */
 
 
 #endif  /* UNIT_TESTS */
