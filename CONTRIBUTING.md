@@ -679,6 +679,8 @@ GitHub Actions workflow (`.github/workflows/gs1encoders.yml`) runs:
 - Linux CI with gcc (`-fanalyzer`) and clang (ASAN+LSAN+UBSAN)
 - MemorySanitizer build (clang+MSAN) on Linux
 - Valgrind memcheck on Linux
+- Compile-time configuration macros: the test suite with each of `EXCLUDE_SYNTAX_DICTIONARY_LOADER` and `EXCLUDE_EMBEDDED_AI_TABLE`,
+  and a check that defining both is rejected
 - Windows CI with MSVC (warnings-as-errors, x64 Release)
 - macOS CI with clang (ASAN+UBSAN; no LSAN on macOS)
 - C++17 wrapper test binary (`test-cpp`) under each of the above sanitizer/valgrind/MSVC configurations
