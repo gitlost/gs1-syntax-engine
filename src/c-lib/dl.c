@@ -780,8 +780,11 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	if (qp)
 		DEBUG_PRINT("  Query params: %s\n", qp);
 
+	if (!qp)					// Skip the loop rather than test p within it
+		goto no_query_params;
+
 	p = qp;
-	while (p && *p) {
+	while (*p) {
 
 		const struct aiEntry* entry = NULL;
 		size_t ailen = 0;
@@ -829,6 +832,8 @@ add_ignored_query_param_to_ai_data:
 		p = r;
 
 	}
+
+no_query_params:
 
 	if (fr)
 		DEBUG_PRINT("  Fragment: %s\n", fr);
