@@ -401,8 +401,8 @@ public:
 
 	/// @brief Get the version string of the library.
 	///
-	/// Returns a string containing the version of the library, typically
-	/// the build date.
+	/// Returns a string containing the Semantic Version of the library, in
+	/// MAJOR.MINOR.PATCH form.
 	///
 	/// @return the version of the library.
 	std::string version() const {

@@ -84,6 +84,27 @@
 #endif
 
 
+/**
+ * @name Library version
+ *
+ * Compile-time constants giving the Semantic Version of the library headers,
+ * permitting conditional use of API that was introduced by a particular
+ * release.
+ *
+ * @note
+ * gs1_encoder_getVersion() reports the version of the library that an
+ * application is running against, which may differ from the version of the
+ * headers that it was compiled against.
+ *
+ * @{
+ */
+#define GS1_ENCODERS_VERSION_MAJOR	1		///< Major version component
+#define GS1_ENCODERS_VERSION_MINOR	4		///< Minor version component
+#define GS1_ENCODERS_VERSION_PATCH	1		///< Patch version component
+#define GS1_ENCODERS_VERSION		"1.4.1"		///< Full version as a string
+/** @} */
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -229,7 +250,9 @@ typedef struct gs1_encoder gs1_encoder;
 /**
  * @brief Get the version string of the library.
  *
- * This is typically the build date.
+ * This is the Semantic Version of the library that the application is running
+ * against, in MAJOR.MINOR.PATCH form, which may differ from
+ * ::GS1_ENCODERS_VERSION of the headers that it was compiled against.
  *
  * The return data does not need to be free()ed.
  *

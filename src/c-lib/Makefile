@@ -676,6 +676,12 @@ copyright:
 
 .PHONY: setversion
 setversion:
+	sed -i -E \
+	    -e 's|^#define GS1_ENCODERS_VERSION_MAJOR[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_MAJOR\t$(MAJOR)|' \
+	    -e 's|^#define GS1_ENCODERS_VERSION_MINOR[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_MINOR\t$(MINOR)|' \
+	    -e 's|^#define GS1_ENCODERS_VERSION_PATCH[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_PATCH\t$(PATCH)|' \
+	    -e 's|^#define GS1_ENCODERS_VERSION[[:space:]]+"[^"]*"|#define GS1_ENCODERS_VERSION\t\t"$(VERSION)"|' \
+	    $(NAME).h
 	(cd ../js-wasm && npm version --allow-same-version $(VERSION))
 	sed -i 's/name="Implementation-Version" value="[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+"/name="Implementation-Version" value="$(VERSION)"/' ../java/build.xml
 

@@ -244,7 +244,7 @@ void gs1_encoder_free(gs1_encoder* const ctx) {
 
 
 __ATTR_CONST char* gs1_encoder_getVersion(void) {
-	return __DATE__;
+	return GS1_ENCODERS_VERSION;
 }
 
 
@@ -909,7 +909,7 @@ char bigbuffer[MAX_DATA+5];
 void test_api_getVersion(void) {
 	const char *version = gs1_encoder_getVersion();
 
-	TEST_CHECK(version != NULL && strcmp(version, __DATE__) == 0);
+	TEST_CHECK(version != NULL && strcmp(version, GS1_ENCODERS_VERSION) == 0);
 }
 
 
