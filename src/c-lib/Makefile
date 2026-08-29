@@ -261,16 +261,40 @@ DEPS = $(addprefix $(BUILD_DIR)/, $(ALL_SRCS:.c=.d)) $(FUZZER_OBJS:.o=.d)
 #
 #  General goals
 #
+
+#
+#  Objects are invalidated whenever the toolchain or the compiler flags
+#  change, since goals such as SANITIZE=yes share a build directory with
+#  plain builds yet produce objects that cannot be linked together
+#
+BUILD_FLAGS = $(CC) $(CFLAGS)
+BUILD_FLAGS_STAMP = $(BUILD_DIR)/.build-flags
+
+#
+#  Coverage deliberately builds one directory twice under differing flags so
+#  that the gcov counters of both runs accumulate; recompiling in between
+#  would discard the counters of the first
+#
+ifneq ($(COVERAGE),yes)
+BUILD_FLAGS_DEP = $(BUILD_FLAGS_STAMP)
+endif
+
+.PHONY: FORCE
+FORCE:
+
+$(BUILD_FLAGS_STAMP): FORCE | $(BUILD_DIR)/
+	@echo '$(BUILD_FLAGS)' | cmp -s - $@ || echo '$(BUILD_FLAGS)' > $@
+
 $(BUILD_DIR)/syntax/:
 	mkdir -p $@
 
-$(BUILD_DIR)/syntax/%.o: syntax/%.c | $(BUILD_DIR)/syntax/
+$(BUILD_DIR)/syntax/%.o: syntax/%.c $(BUILD_FLAGS_DEP) | $(BUILD_DIR)/syntax/
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/:
 	mkdir -p $@
 
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)/
+$(BUILD_DIR)/%.o: %.c $(BUILD_FLAGS_DEP) | $(BUILD_DIR)/
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
