@@ -582,7 +582,12 @@ scanned data should be pre-processed to meet this requirement.
 ### Compile-Time Configuration Macros
 
 The following macros may be defined at compile time to enable or disable
-optional features:
+optional features. When building with the supplied Makefile they are passed
+via `EXTRA_CFLAGS`, for example:
+
+```
+make lib EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER
+```
 
 `GS1_ENCODERS_ERR_LANG=<LANG>`
 :  Used to specify alternative translation strings for error messages.

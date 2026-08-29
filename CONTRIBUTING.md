@@ -459,6 +459,9 @@ make -j $(nproc) libstatic   # Static library only
 make -j $(nproc) example         # C API example using shared library
 make -j $(nproc) app-cpp         # C++ console app using shared library
 make -j $(nproc) app-cpp-static  # Standalone static C++ console app
+
+# Pass compile-time configuration macros
+make -j $(nproc) lib EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER
 ```
 
 Note: On macOS use `sysctl -n hw.ncpu` instead of `$(nproc)`.
