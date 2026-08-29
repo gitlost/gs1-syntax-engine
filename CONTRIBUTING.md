@@ -684,6 +684,7 @@ GitHub Actions workflow (`.github/workflows/gs1encoders.yml`) runs:
 - Linux CI with gcc (`-fanalyzer`) and clang (ASAN+LSAN+UBSAN)
 - MemorySanitizer build (clang+MSAN) on Linux
 - Valgrind memcheck on Linux
+- Fuzzer build (clang+ASAN+LSAN+UBSAN+libFuzzer), which also seeds each corpus and so runs every seed through its target
 - Compile-time configuration macros: the test suite with each of `EXCLUDE_SYNTAX_DICTIONARY_LOADER` and `EXCLUDE_EMBEDDED_AI_TABLE`,
   and a check that defining both is rejected
 - Windows CI with MSVC (warnings-as-errors, x64 Release)

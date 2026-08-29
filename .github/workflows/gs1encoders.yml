@@ -211,6 +211,26 @@ jobs:
             SLOW_TESTS=yes test
           echo '::endgroup::'
 
+  ci-fuzzer:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Fuzzer CI
+        run: |
+
+          # For llvm-symbolizer and lld
+          sudo apt-get -y --no-install-recommends install llvm lld
+
+          echo '::group::Build fuzzers and seed their corpora (clang+ASAN+LSAN+UBSAN+libFuzzer)'
+          make -C src/c-lib -j "$(nproc)" fuzzer
+          echo '::endgroup::'
+
   ci-build-options:
 
     runs-on: ubuntu-latest
