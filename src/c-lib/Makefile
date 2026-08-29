@@ -28,6 +28,7 @@ PATCH = $(word 3,$(subst ., ,$(VERSION)))
 NAME = gs1encoders
 
 BUILD_DIR = build
+ALL_BUILD_DIRS = build build-test build-fuzzer build-msan build-coverage build-wasm
 
 
 ARCH := $(shell $(CC) -dumpmachine)
@@ -76,26 +77,6 @@ else
 CFLAGS_G = -g
 CFLAGS_O = -O2
 CFLAGS_V = -fvisibility=hidden
-endif
-
-ifeq ($(MAKECMDGOALS),clean-test)
-BUILD_DIR = build-test
-endif
-
-ifeq ($(MAKECMDGOALS),clean-fuzzer)
-BUILD_DIR = build-fuzzer
-endif
-
-ifeq ($(MAKECMDGOALS),clean-msan)
-BUILD_DIR = build-msan
-endif
-
-ifeq ($(MAKECMDGOALS),clean-coverage)
-BUILD_DIR = build-coverage
-endif
-
-ifeq ($(MAKECMDGOALS),clean-wasm)
-BUILD_DIR = build-wasm
 endif
 
 ifneq ($(filter fuzzer fuzzer-% fuzzer-corpus-seeds,$(MAKECMDGOALS)),)
@@ -568,20 +549,20 @@ fuzzer: $(FUZZER_BINS) | $(FUZZER_CORPUSES) fuzzer-corpus-seeds
 
 .PHONY: clean
 clean:
-	$(RM) -r build build-test build-fuzzer build-msan build-coverage build-wasm
+	$(RM) -r $(ALL_BUILD_DIRS)
 	$(RM) $(WASM_DIST_FILES) *.gcov
 
 .PHONY: clean-test
 clean-test:
-	$(RM) $(OBJS) $(EXAMPLE_BIN) $(APP_CPP_BIN) $(APP_CPP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(LINTER_TEST_BIN) $(LINTER_TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build-test
 
 .PHONY: clean-fuzzer
 clean-fuzzer:
-	$(RM) $(OBJS) $(EXAMPLE_BIN) $(APP_CPP_BIN) $(APP_CPP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(LINTER_TEST_BIN) $(LINTER_TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build-fuzzer
 
 .PHONY: clean-msan
 clean-msan:
-	$(RM) $(OBJS) $(EXAMPLE_BIN) $(APP_CPP_BIN) $(APP_CPP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(LINTER_TEST_BIN) $(LINTER_TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build-msan
 
 .PHONY: clean-coverage
 clean-coverage:
@@ -593,7 +574,8 @@ clean-fuzzer-corpus:
 
 .PHONY: clean-wasm
 clean-wasm:
-	$(RM) $(OBJS) $(WASM_JS) $(WASM_WASM) $(WASM_DIST_FILES) $(DEPS)
+	$(RM) -r build-wasm
+	$(RM) $(WASM_DIST_FILES)
 
 .PHONY: install
 install: install-static install-shared
