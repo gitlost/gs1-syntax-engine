@@ -664,6 +664,7 @@ setversion:
 	    -e 's|^#define GS1_ENCODERS_VERSION_PATCH[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_PATCH\t$(PATCH)|' \
 	    -e 's|^#define GS1_ENCODERS_VERSION[[:space:]]+"[^"]*"|#define GS1_ENCODERS_VERSION\t\t"$(VERSION)"|' \
 	    $(NAME).h
+	sed -i -E 's|<Version>[^<]*</Version>|<Version>$(VERSION)</Version>|' ../dotnet-lib/gs1encoders-dotnet-lib.csproj ../dotnet-app/gs1encoders-dotnet-app.csproj
 	(cd ../js-wasm && npm version --allow-same-version $(VERSION))
 	sed -i 's/name="Implementation-Version" value="[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+"/name="Implementation-Version" value="$(VERSION)"/' ../java/build.xml
 
