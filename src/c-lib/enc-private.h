@@ -29,6 +29,11 @@
 #include "gs1encoders.h"
 
 
+#if defined(EXCLUDE_EMBEDDED_AI_TABLE) && defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER)
+#error "EXCLUDE_EMBEDDED_AI_TABLE and EXCLUDE_SYNTAX_DICTIONARY_LOADER are mutually exclusive: the AI table would have no source"
+#endif
+
+
 // Implementation limits that can be changed
 #define MAX_DATA	8191	// Maximum input buffer size
 
