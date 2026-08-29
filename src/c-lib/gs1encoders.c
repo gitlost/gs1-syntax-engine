@@ -810,6 +810,45 @@ bool gs1_tokenise(const char *data, char delim, gs1_tok_t *tok) {
 }
 
 
+/*
+ *  Reentrant tokeniser with strtok_r semantics, which is POSIX rather than
+ *  ISO C and therefore not available on all targets
+ *
+ */
+char* gs1_strtok_r(char *str, const char *delim, char **saveptr) {
+
+	char *tok, *p;
+
+	assert(delim);
+	assert(saveptr);
+
+	p = str ? str : *saveptr;
+	if (!p)
+		return NULL;
+
+	while (*p && strchr(delim, *p))		// Leading delimiters
+		p++;
+
+	if (!*p) {
+		*saveptr = p;
+		return NULL;
+	}
+
+	tok = p;
+
+	while (*p && !strchr(delim, *p))	// Scan to end of token
+		p++;
+
+	if (*p)
+		*p++ = '\0';
+
+	*saveptr = p;
+
+	return tok;
+
+}
+
+
 char* gs1_strdup_alloc(const char *s) {
 
 	size_t len = strlen(s) + 1;
@@ -837,7 +876,7 @@ char* gs1_strdup_alloc(const char *s) {
  *  versus "bad data" (e.g. illegal AI to vivify due to clash with known AIs).
  *
  */
-__ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const haystack, const size_t haystack_size,
+__ATTR_PURE ptrdiff_t gs1_binarySearch(const void* const needle, const void* const haystack, const size_t haystack_size,
 			 int (* const compare)(const void* const key, const void* const element, const size_t index),
 			 bool (* const validate)(const void* const key, const void* const element, const size_t index)) {
 
@@ -851,7 +890,7 @@ __ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const
 			size_t i;
 
 			if (!validate || validate(needle, haystack, m))
-				return (ssize_t)m;
+				return (ptrdiff_t)m;
 
 			/*
 			 *  The comparison matched but validation failed.
@@ -865,14 +904,14 @@ __ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const
 				if (compare(needle, haystack, i - 1) != 0)
 					break;
 				else if (validate(needle, haystack, i - 1))
-					return (ssize_t)(i - 1);
+					return (ptrdiff_t)(i - 1);
 			// LCOV_EXCL_STOP
 
 			for (i = m + 1; i < haystack_size; i++)
 				if (compare(needle, haystack, i) != 0)
 					break;
 				else if (validate(needle, haystack, i))
-					return (ssize_t)i;
+					return (ptrdiff_t)i;
 
 			return GS1_SEARCH_INVALID;
 
@@ -910,6 +949,38 @@ void test_api_getVersion(void) {
 	const char *version = gs1_encoder_getVersion();
 
 	TEST_CHECK(version != NULL && strcmp(version, GS1_ENCODERS_VERSION) == 0);
+}
+
+
+void test_api_strtok_r(void) {
+
+	char buf[] = "  alpha\tbeta   gamma  delta";
+	char only[] = ",,,";
+	char empty[] = "";
+	const char *tok;
+	char *saveptr = NULL;
+
+	TEST_ASSERT((tok = gs1_strtok_r(buf, " \t", &saveptr)) != NULL);
+	TEST_CHECK(strcmp(tok, "alpha") == 0);				// Leading delimiters skipped
+
+	TEST_ASSERT((tok = gs1_strtok_r(NULL, " \t", &saveptr)) != NULL);
+	TEST_CHECK(strcmp(tok, "beta") == 0);
+
+	TEST_ASSERT((tok = gs1_strtok_r(NULL, "", &saveptr)) != NULL);
+	TEST_CHECK(strcmp(tok, "  gamma  delta") == 0);			// Empty set yields the remainder
+
+	TEST_CHECK(gs1_strtok_r(NULL, " \t", &saveptr) == NULL);
+	TEST_CHECK(gs1_strtok_r(NULL, " \t", &saveptr) == NULL);	// Stays exhausted
+
+	saveptr = NULL;
+	TEST_CHECK(gs1_strtok_r(NULL, ",", &saveptr) == NULL);		// No string and no saved position
+
+	saveptr = NULL;
+	TEST_CHECK(gs1_strtok_r(only, ",", &saveptr) == NULL);		// Only delimiters
+
+	saveptr = NULL;
+	TEST_CHECK(gs1_strtok_r(empty, ",", &saveptr) == NULL);
+
 }
 
 

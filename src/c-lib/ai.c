@@ -279,7 +279,7 @@ __ATTR_PURE const struct aiEntry* gs1_lookupAIentry(const gs1_encoder* const ctx
 
 	size_t aiLenByPrefix;
 	struct aiTableLookupKey lookupKey = { ai, ailen };
-	ssize_t index;
+	ptrdiff_t index;
 
 	assert(ailen == 0 || ailen <= strlen(ai));
 
@@ -440,7 +440,7 @@ bool existsInAIdata(const gs1_encoder* const ctx, const char* const ai, const si
 
 	size_t prefixlen = 0;
 	struct aiDataLookupKey searchKey;
-	ssize_t index;
+	ptrdiff_t index;
 
 	/* Count fixed digits in a template such as "35nn" (2) or "310n" (3) */
 	while (prefixlen < ailen && ai[prefixlen] >= '0' && ai[prefixlen] <= '9')

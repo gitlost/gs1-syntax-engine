@@ -180,7 +180,7 @@ endif
 #
 EXTRA_CFLAGS =
 
-CFLAGS = $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_FORTIFY) $(CFLAGS_V) -Wall -Wextra -Wconversion -Wformat=2 -Wshadow -Wdeclaration-after-statement -pedantic -Wundef -Wnull-dereference -Wstrict-prototypes -Werror -fstack-protector-strong -MMD -fPIC -DGS1_LINTER_ERR_STR_EN $(SAN_CFLAGS) $(COV_CFLAGS) $(ANALYZER_CFLAGS) $(UNIT_TEST_CFLAGS) $(DEBUG_CFLAGS) $(SLOW_TESTS_CFLAGS) $(EXTRA_CFLAGS)
+CFLAGS = -std=c99 $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_FORTIFY) $(CFLAGS_V) -Wall -Wextra -Wconversion -Wformat=2 -Wshadow -Wdeclaration-after-statement -pedantic -Wundef -Wnull-dereference -Wstrict-prototypes -Werror -fstack-protector-strong -MMD -fPIC -DGS1_LINTER_ERR_STR_EN $(SAN_CFLAGS) $(COV_CFLAGS) $(ANALYZER_CFLAGS) $(UNIT_TEST_CFLAGS) $(DEBUG_CFLAGS) $(SLOW_TESTS_CFLAGS) $(EXTRA_CFLAGS)
 
 TEST_BIN = $(BUILD_DIR)/$(NAME)-test.$(BIN_SUFFIX)
 

@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -40,11 +41,8 @@
 
 #ifdef _MSC_VER
 #include <malloc.h>
-#define strtok_r strtok_s
-#define ssize_t ptrdiff_t
 #define alloca _alloca
 #else
-#  include <sys/types.h>			// IWYU pragma: export
 #  if (defined(__GNUC__) && !defined(alloca) && !defined(__NetBSD__)) || defined(__NuttX__) || defined(_AIX) \
         || (defined(__sun) && defined(__SVR4) /*Solaris*/)
 #    include <alloca.h>				// IWYU pragma: export
@@ -404,9 +402,11 @@ typedef struct {
 
 bool gs1_tokenise(const char *data, char delim, gs1_tok_t *tok);
 
+char* gs1_strtok_r(char *str, const char *delim, char **saveptr);
+
 char* gs1_strdup_alloc(const char *s);
 
-ssize_t gs1_binarySearch(const void* needle, const void* haystack, const size_t haystack_size,
+ptrdiff_t gs1_binarySearch(const void* needle, const void* haystack, const size_t haystack_size,
 			 int (*compare)(const void* key, const void* element, const size_t index),
 			 bool (*validate)(const void* key, const void* element, const size_t index));
 
@@ -414,6 +414,7 @@ ssize_t gs1_binarySearch(const void* needle, const void* haystack, const size_t 
 #ifdef UNIT_TESTS
 
 void test_api_getVersion(void);
+void test_api_strtok_r(void);
 void test_api_instanceSize(void);
 void test_api_init(void);
 #ifndef EXCLUDE_EMBEDDED_AI_TABLE

@@ -57,6 +57,7 @@ TEST_LIST = {
      *
      */
     { "api_getVersion", test_api_getVersion },
+    { "api_strtok_r", test_api_strtok_r },
     { "api_instanceSize", test_api_instanceSize },
     { "api_init", test_api_init },
 #ifndef EXCLUDE_EMBEDDED_AI_TABLE

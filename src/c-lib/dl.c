@@ -157,7 +157,7 @@ static const struct aiEntry* aiEntryFromAlpha(const gs1_encoder* const ctx, cons
 	const char* ai;
 	const struct aiEntry *entry;
 	struct alpha_len_s alpha_len = { .alpha = alpha, .len = len };
-	const ssize_t index = gs1_binarySearch(&alpha_len, alpha_ai_map, SIZEOF_ARRAY(alpha_ai_map), compareAlphaAI, NULL);
+	const ptrdiff_t index = gs1_binarySearch(&alpha_len, alpha_ai_map, SIZEOF_ARRAY(alpha_ai_map), compareAlphaAI, NULL);
 
 	if (index < 0)
 		return NULL;
@@ -385,7 +385,7 @@ static int getDLpathAIseqEntry(const gs1_encoder* const ctx, const char (*ais)[M
 	char* aiseq;
 	char *p;
 	int i;
-	ssize_t index;
+	ptrdiff_t index;
 
 	assert(len >= 1);
 
@@ -434,7 +434,7 @@ static inline __ATTR_CONST uint8_t hex_nibble(char c) {
 	return UINT8_MAX;
 }
 
-static ssize_t URIunescape(char* const out, size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
+static ptrdiff_t URIunescape(char* const out, size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
 
 	size_t i, j;
 
@@ -460,12 +460,12 @@ static ssize_t URIunescape(char* const out, size_t maxlen, const char* const in,
 	}
 	out[j] = '\0';
 
-	return (i == inlen) ? (ssize_t)j : -1;
+	return (i == inlen) ? (ptrdiff_t)j : -1;
 
 }
 
 
-static ssize_t URIescape(char* const out, const size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
+static ptrdiff_t URIescape(char* const out, const size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
 
 	static const char HEX[] = "0123456789ABCDEF";
 	size_t i, j;
@@ -491,7 +491,7 @@ static ssize_t URIescape(char* const out, const size_t maxlen, const char* const
 	}
 	out[j] = '\0';
 
-	return (i == inlen) ? (ssize_t)j : -1;
+	return (i == inlen) ? (ptrdiff_t)j : -1;
 
 }
 
@@ -540,7 +540,7 @@ static bool parseDLAIvaluePair(gs1_encoder* const ctx, const struct aiEntry* con
 	const bool isQueryParam = dlPathOrder == DL_PATH_ORDER_ATTRIBUTE;
 	const char* const val = ai + ailen + 1;
 	const char *outai, *outval;
-	ssize_t vallen;
+	ptrdiff_t vallen;
 	const size_t dataStrCap = MAX_DATA;	// dataStr is written from the start
 
 	DEBUG_PRINT("    Extracted AI: (%.*s)\n", (int)ailen, ai);
@@ -590,7 +590,7 @@ static bool parseDLAIvaluePair(gs1_encoder* const ctx, const struct aiEntry* con
 		}
 		// LCOV_EXCL_STOP
 		for (j = 0; j <= 13; j++)
-			v[13-j] = vallen >= (ssize_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
+			v[13-j] = vallen >= (ptrdiff_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
 		v[14] = '\0';
 		vallen = 14;
 	}
@@ -968,7 +968,7 @@ static bool emitDLAIvaluePair(char** const pp, size_t* const avail, const struct
 
 	char *p = *pp;
 	const size_t lead = isQueryParam ? 0 : 1;	// Leading "/" of a path element
-	ssize_t len;
+	ptrdiff_t len;
 
 	// Need room for the punctuated AI, the escaped value and a trailing NUL or '&'
 	if (*avail < (size_t)ai->ailen + lead + 3)
@@ -1905,11 +1905,11 @@ static void do_test_URIunescape(const char* const file, const int line, const ch
 	snprintf(casename, sizeof(casename), "%s:%d: %s => %s | %s", file, line, in, expect_path, expect_query);
 	TEST_CASE(casename);
 
-	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), false) == (ssize_t)strlen(expect_path));
+	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), false) == (ptrdiff_t)strlen(expect_path));
 	TEST_CHECK(strcmp(out, expect_path) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected query component: %s", in, out, expect_path);
 
-	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), true) == (ssize_t)strlen(expect_query));
+	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), true) == (ptrdiff_t)strlen(expect_query));
 	TEST_CHECK(strcmp(out, expect_query) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected path component: %s", in, out, expect_query);
 
@@ -1983,11 +1983,11 @@ static void do_test_URIescape(const char* const file, const int line, const char
 	snprintf(casename, sizeof(casename), "%s:%d: %s => %s | %s", file, line, in, expect_path, expect_query);
 	TEST_CASE(casename);
 
-	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), false) == (ssize_t)strlen(expect_path));
+	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), false) == (ptrdiff_t)strlen(expect_path));
 	TEST_CHECK(strcmp(out, expect_path) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected path component: %s", in, out, expect_path);
 
-	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), true) == (ssize_t)strlen(expect_query));
+	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), true) == (ptrdiff_t)strlen(expect_query));
 	TEST_CHECK(strcmp(out, expect_query) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected query component: %s", in, out, expect_query);
 

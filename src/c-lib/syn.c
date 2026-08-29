@@ -61,7 +61,7 @@ static int processComponent(gs1_encoder* const ctx, char* const component, struc
 	size_t len;
 
 	// First component is the format specification
-	token = strtok_r(component, ",", &saveptr);
+	token = gs1_strtok_r(component, ",", &saveptr);
 	assert(token);	// Callers guarantee non-empty component
 	p = token;
 	len = strlen(p);
@@ -121,7 +121,7 @@ static int processComponent(gs1_encoder* const ctx, char* const component, struc
 
 	// Remaining tokens are the names of linters
 	numlinters = 0;
-	while ((token = strtok_r(NULL, ",", &saveptr)) != NULL) {
+	while ((token = gs1_strtok_r(NULL, ",", &saveptr)) != NULL) {
 
 		if (numlinters >= MAX_LINTERS - 1)
 			error_v(NUMBER_OF_LINTERS_EXCEEDS_IMPL_LIMIT, component);
@@ -186,7 +186,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 
 	// Do nothing with empty and comment-only lines
 	memcpy(linebuf, line, len + 1);			// Includes NULL
-	token = strtok_r(linebuf, " \t", &saveptr);
+	token = gs1_strtok_r(linebuf, " \t", &saveptr);
 	if (!token || *token == '#')
 		return 0;
 
@@ -241,7 +241,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 	if (*entry != sd && strcmp((*entry)->ai, (*entry)[-1].ai) <= 0)
 		error(AIS_MUST_BE_IN_ASCENDING_ORDER);
 
-	token = strtok_r(NULL, " \t", &saveptr);
+	token = gs1_strtok_r(NULL, " \t", &saveptr);
 	if (!token)
 		error(TRUNCATED_AFTER_AI);
 
@@ -263,7 +263,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 		if (strchr(token, '?'))
 			(*entry)->dlDataAttr = DL_DATA_ATTR;
 
-		token = strtok_r(NULL, " \t", &saveptr);
+		token = gs1_strtok_r(NULL, " \t", &saveptr);
 		if (!token)
 			error(TRUNCATED_AFTER_FLAGS);
 
@@ -279,7 +279,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 			goto fail;
 
 		numparts++;
-		token = strtok_r(NULL, " \t", &saveptr);
+		token = gs1_strtok_r(NULL, " \t", &saveptr);
 	}
 	if (numparts == 0)
 		error(AI_IS_MISSING_COMPONENTS);
@@ -363,7 +363,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 		p += toklen;
 		*p++ = ' ';
 
-		token = strtok_r(NULL, " \t", &saveptr);
+		token = gs1_strtok_r(NULL, " \t", &saveptr);
 
 	}
 	if (p != buf)
@@ -373,7 +373,7 @@ int parseSyntaxDictionaryEntry(gs1_encoder* const ctx, const char* const line, c
 		error(FAILED_TO_ALLOCATE_MEMORY_FOR_ATTRS);
 
 	// Read until the end of line for the title
-	token = strtok_r(NULL, "", &saveptr);
+	token = gs1_strtok_r(NULL, "", &saveptr);
 	if (token) {
 
 		if (strlen(token) > MAX_AI_TITLE_LEN)

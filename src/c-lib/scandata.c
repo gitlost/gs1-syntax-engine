@@ -468,7 +468,7 @@ bool gs1_processScanData(gs1_encoder* const ctx, const char* scanData) {
 
 	scanData += 3;
 
-	if (strnlen(scanData, MAX_DATA) >= MAX_DATA) {
+	if (!memchr(scanData, '\0', MAX_DATA)) {		// No NUL within bounds
 		SET_ERR_V(DATA_TOO_LONG, MAX_DATA - 1);
 		goto fail;
 	}

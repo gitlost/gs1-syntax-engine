@@ -7,7 +7,7 @@ X.X.X
 * Java: The JNI wrapper no longer encounters undefined behaviour when the underlying C library getters return no value.
 * `make install` now creates the shared library soname and linker name symlinks, without which the installed library could not be linked against, and `make uninstall` removes everything that `make install` creates.
 * `make install` now also installs a `pkg-config` file, so that applications can obtain their compiler and linker flags with `pkg-config --cflags --libs gs1encoders` rather than hard-coding paths.
-* Core: The library depends only on ISO C99. The POSIX `strtok_r` and `strnlen` were replaced by internal equivalents and the Makefile compiles with `-std=c99`, so the sources build on targets that provide no POSIX interfaces.
+* Core: The library depends only on ISO C99. The POSIX `strtok_r`, `strnlen` and `ssize_t` were replaced by ISO C equivalents and the Makefile compiles with `-std=c99`, so the sources build on targets that provide no POSIX interfaces.
 * Compile-time configuration macros may be passed to the Makefile using `EXTRA_CFLAGS`. Defining both `EXCLUDE_EMBEDDED_AI_TABLE` and `EXCLUDE_SYNTAX_DICTIONARY_LOADER`, which are mutually exclusive, is now rejected at compile time.
 * The .NET library and demo application assemblies now carry the release version, which `make setversion` keeps in step with the other manifests.
 * The console demo application now reports the release version rather than its build date, which it continues to show in its banner.

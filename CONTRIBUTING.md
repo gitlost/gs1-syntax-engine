@@ -64,6 +64,8 @@ how users must structure their applications.
 
 - C code must compile on MSVC, GCC and Clang (including Apple's Clang variant)
 - All C code must compile cleanly with `-Wall -Wextra -Wconversion -Werror -pedantic`
+- The library depends only on ISO C99, which the Makefile enforces with `-std=c99`; POSIX-only interfaces such as `strtok_r`, `strnlen`
+  and `ssize_t` must not be used by the library sources
 - Use `const` liberally - both for pointer targets and the pointers themselves: `const char* const str`
 - Use Doxygen-style comments for public API functions (`@param`, `@return`, `@note`)
 - Use `size_t` for iterating unbounded memory, otherwise native-width `int` if sufficient; avoid smaller types that may actually reduce performance
