@@ -72,7 +72,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	gs1_encoder_setAddCheckDigit(ctx, (cfg >> 7) & 1);
 
 	if (len > MAX_DATA+49)
-		return -1;
+		return 0;
 
 	memcpy(in, buf, len);
 	in[len] = '\0';
@@ -86,7 +86,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	 *
 	 */
 	if (!gs1_encoder_setDataStr(ctx, in))
-		return -1;
+		return 0;
 
 	/*
 	 *  The input was accepted, so exercise the output paths.
@@ -117,7 +117,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	 *
 	 */
 	if ((out = gs1_encoder_getDLuri(ctx, stem)) == NULL)
-		return -1;
+		return 0;
 	if (!((cfg >> 7) & 1)) {
 		memcpy(outDL1, out, strlen(out) + 1);
 

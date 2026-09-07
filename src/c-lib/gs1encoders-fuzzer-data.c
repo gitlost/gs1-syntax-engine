@@ -62,7 +62,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	gs1_encoder_setAddCheckDigit(ctx, (cfg >> 7) & 1);
 
 	if (len > MAX_DATA+49)
-		return -1;
+		return 0;
 
 	memcpy(in, buf, len);
 	in[len] = '\0';
@@ -70,7 +70,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* const buf, size_t len) {
 	memcpy(pristine, in, len);
 
 	if (!gs1_encoder_setDataStr(ctx, in))
-		return -1;
+		return 0;
 
 	// Test that the input hasn't been corrupted
 	if (memcmp(in, pristine, len) != 0) {

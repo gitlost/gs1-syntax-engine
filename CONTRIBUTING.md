@@ -64,6 +64,8 @@ how users must structure their applications.
 
 - C code must compile on MSVC, GCC and Clang (including Apple's Clang variant)
 - All C code must compile cleanly with `-Wall -Wextra -Wconversion -Werror -pedantic`
+- The library depends only on ISO C99, which the Makefile enforces with `-std=c99`; POSIX-only interfaces such as `strtok_r`, `strnlen`,
+  `ssize_t` and `alloca` must not be used by the library sources
 - Use `const` liberally - both for pointer targets and the pointers themselves: `const char* const str`
 - Use Doxygen-style comments for public API functions (`@param`, `@return`, `@note`)
 - Use `size_t` for iterating unbounded memory, otherwise native-width `int` if sufficient; avoid smaller types that may actually reduce performance
@@ -124,10 +126,13 @@ provides `GS1_ENCODERS_CUSTOM_MALLOC`, `GS1_ENCODERS_CUSTOM_CALLOC`,
 the [C API documentation](https://gs1.github.io/gs1-syntax-engine/) for a
 custom heap management example.
 
-**Stack allocation** (`alloca`):
+**Stack allocation**:
 
-- Use only when necessary to avoid large extensions to the context structure or to avoid runtime heap allocation
-- Hoist out of loops to avoid repeated stack growth
+- Use automatic arrays sized from the compile-time implementation limits, with
+  an `assert()` tying the runtime length to the bound
+- Don't use `alloca` or variable-length arrays: they defeat the static stack
+  analysis that embedded integrators rely on, `alloca` has no failure mode, and
+  neither is available on MSVC
 
 ### Performance Patterns
 
@@ -459,6 +464,9 @@ make -j $(nproc) libstatic   # Static library only
 make -j $(nproc) example         # C API example using shared library
 make -j $(nproc) app-cpp         # C++ console app using shared library
 make -j $(nproc) app-cpp-static  # Standalone static C++ console app
+
+# Pass compile-time configuration macros
+make -j $(nproc) lib EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER
 ```
 
 Note: On macOS use `sysctl -n hw.ncpu` instead of `$(nproc)`.
@@ -596,6 +604,16 @@ ASAN_OPTIONS="symbolize=1 detect_leaks=1" ./build-fuzzer/gs1encoders-fuzzer-ais 
 
 To regenerate seeds for an existing corpus, delete the corpus directory first.
 
+**OSS-Fuzz**: the same five targets are continuously fuzzed by OSS-Fuzz. The
+build logic lives in `maintenance/ossfuzz/build.sh`; the `google/oss-fuzz`
+integration only delegates to it. That script must not select a compiler or
+add warning flags, since OSS-Fuzz supplies `$CC`, `$CXX`, `$CFLAGS`,
+`$CXXFLAGS` and `$LIB_FUZZING_ENGINE` in order to build each sanitizer and
+fuzzing engine combination itself. It also emits the per-target seed corpus
+zips and the `.options` files that cap generated input at `MAX_DATA+49`, the
+largest length the harnesses accept. See `maintenance/README.md` for how to
+test the integration locally.
+
 **Fuzzer configuration**: Each fuzzer derives a configuration bitmask from the
 input content (polynomial hash) to toggle options such as `permitUnknownAIs`,
 `permitZeroSuppressedGTINinDLuris`, `includeDataTitlesInHRI`, validation
@@ -666,6 +684,9 @@ GitHub Actions workflow (`.github/workflows/gs1encoders.yml`) runs:
 - Linux CI with gcc (`-fanalyzer`) and clang (ASAN+LSAN+UBSAN)
 - MemorySanitizer build (clang+MSAN) on Linux
 - Valgrind memcheck on Linux
+- Fuzzer build (clang+ASAN+LSAN+UBSAN+libFuzzer), which also seeds each corpus and so runs every seed through its target
+- Compile-time configuration macros: the test suite with each of `EXCLUDE_SYNTAX_DICTIONARY_LOADER` and `EXCLUDE_EMBEDDED_AI_TABLE`,
+  and a check that defining both is rejected
 - Windows CI with MSVC (warnings-as-errors, x64 Release)
 - macOS CI with clang (ASAN+UBSAN; no LSAN on macOS)
 - C++17 wrapper test binary (`test-cpp`) under each of the above sanitizer/valgrind/MSVC configurations

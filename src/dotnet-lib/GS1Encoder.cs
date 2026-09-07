@@ -381,7 +381,7 @@ namespace GS1.Encoders
         /// Get the version string of the library.
         /// </summary>
         /// <value>
-        /// A string containing the version of the library, typically the build date.
+        /// A string containing the Semantic Version of the library, in MAJOR.MINOR.PATCH form.
         /// </value>
         public string Version
         {

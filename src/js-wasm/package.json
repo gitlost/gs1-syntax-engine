@@ -6,7 +6,7 @@
     "digital-link",
     "gs1-digital-link",
     "application-identifiers",
-    "gs1-symtax"
+    "gs1-syntax"
   ],
   "main": "gs1encoder.mjs",
   "types": "gs1encoder.d.ts",

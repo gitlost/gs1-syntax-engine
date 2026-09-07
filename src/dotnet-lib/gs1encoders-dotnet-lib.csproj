@@ -5,7 +5,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>gs1encoders_dotnet</RootNamespace>
     <AssemblyName>gs1encoders-dotnet</AssemblyName>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Version>1.4.1</Version>
+    <Authors>GS1 AISBL</Authors>
+    <Company>GS1 AISBL</Company>
+    <Copyright>GS1 AISBL</Copyright>
+    <Product>GS1 Barcode Syntax Engine</Product>
   </PropertyGroup>
   
   <PropertyGroup>

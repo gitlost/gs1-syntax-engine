@@ -107,6 +107,26 @@ Build using Visual Studio or from a Developer Command Prompt:
 
 This generates the library in `src\c-lib\build\library\x64\Release\gs1encoders.dll`.
 
+#### Installing the library
+
+**On Unix/macOS:**
+
+    make -C src/c-lib install
+
+This installs the shared and static libraries, the `gs1encoders.h` and
+`gs1encoders.hpp` headers, and a `pkg-config` file. Set `PREFIX` (default
+`/usr/local`), `LIBDIR` and `DESTDIR` as required.
+
+Applications then obtain their compiler and linker flags without hard-coding
+any paths:
+
+    cc myapp.c `pkg-config --cflags --libs gs1encoders` -o myapp
+
+The `pkg-config` file also carries the library version, so a build can require
+a minimum release:
+
+    pkg-config --atleast-version=1.4.1 gs1encoders
+
 #### Running the examples
 
 After building, you can exercise the library in two ways: a non-interactive
@@ -582,7 +602,12 @@ scanned data should be pre-processed to meet this requirement.
 ### Compile-Time Configuration Macros
 
 The following macros may be defined at compile time to enable or disable
-optional features:
+optional features. When building with the supplied Makefile they are passed
+via `EXTRA_CFLAGS`, for example:
+
+```
+make lib EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER
+```
 
 `GS1_ENCODERS_ERR_LANG=<LANG>`
 :  Used to specify alternative translation strings for error messages.

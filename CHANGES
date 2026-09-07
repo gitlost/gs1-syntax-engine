@@ -1,8 +1,16 @@
 X.X.X
 
 * Core: `gs1_encoder_getScanData()` now reports an error that can be read using `gs1_encoder_getErrMsg()` on every failure path.
+* Core: `gs1_encoder_getVersion()` now returns the Semantic Version of the library rather than the build date. The version is also available at compile time via the `GS1_ENCODERS_VERSION`, `GS1_ENCODERS_VERSION_MAJOR`, `GS1_ENCODERS_VERSION_MINOR` and `GS1_ENCODERS_VERSION_PATCH` macros, permitting conditional use of API that was introduced by a particular release.
 * Wrappers: Getting the scan data now throws a scan data exception on failure, consistent with the existing behaviour when getting a GS1 Digital Link URI. Previously the scan data getters returned null or an empty string, indistinguishable from benign absence.
+* Wrappers: The version reported by each binding follows the C library, so it is now the Semantic Version rather than the build date.
 * Java: The JNI wrapper no longer encounters undefined behaviour when the underlying C library getters return no value.
+* `make install` now creates the shared library soname and linker name symlinks, without which the installed library could not be linked against, and `make uninstall` removes everything that `make install` creates.
+* `make install` now also installs a `pkg-config` file, so that applications can obtain their compiler and linker flags with `pkg-config --cflags --libs gs1encoders` rather than hard-coding paths.
+* Core: The library depends only on ISO C99. The POSIX `strtok_r`, `strnlen`, `ssize_t` and `alloca` were replaced by ISO C equivalents and the Makefile compiles with `-std=c99`, so the sources build on targets that provide no POSIX interfaces. Removing `alloca` also makes the stack usage of GS1 Digital Link URI parsing statically bounded.
+* Compile-time configuration macros may be passed to the Makefile using `EXTRA_CFLAGS`. Defining both `EXCLUDE_EMBEDDED_AI_TABLE` and `EXCLUDE_SYNTAX_DICTIONARY_LOADER`, which are mutually exclusive, is now rejected at compile time.
+* The .NET library and demo application assemblies now carry the release version, which `make setversion` keeps in step with the other manifests.
+* The console demo application now reports the release version rather than its build date, which it continues to show in its banner.
 
 
 1.4.1

@@ -18,8 +18,6 @@
  *
  */
 
-// IWYU pragma: no_include <alloca.h>
-
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -157,7 +155,7 @@ static const struct aiEntry* aiEntryFromAlpha(const gs1_encoder* const ctx, cons
 	const char* ai;
 	const struct aiEntry *entry;
 	struct alpha_len_s alpha_len = { .alpha = alpha, .len = len };
-	const ssize_t index = gs1_binarySearch(&alpha_len, alpha_ai_map, SIZEOF_ARRAY(alpha_ai_map), compareAlphaAI, NULL);
+	const ptrdiff_t index = gs1_binarySearch(&alpha_len, alpha_ai_map, SIZEOF_ARRAY(alpha_ai_map), compareAlphaAI, NULL);
 
 	if (index < 0)
 		return NULL;
@@ -382,15 +380,14 @@ static __ATTR_PURE int compareDLKeyQualifier(const void* const key, const void* 
 static int getDLpathAIseqEntry(const gs1_encoder* const ctx, const char (*ais)[MAX_AI_LEN+1], const int len) {
 
 	const size_t bufsize = (size_t)len * (MAX_AI_LEN + 1);
-	char* aiseq;
+	char aiseq[MAX_AIS * (MAX_AI_LEN + 1)];
 	char *p;
 	int i;
-	ssize_t index;
+	ptrdiff_t index;
 
 	assert(len >= 1);
+	assert(bufsize <= sizeof(aiseq));
 
-	// cppcheck-suppress allocaCalled
-	aiseq = alloca(bufsize);
 	p = aiseq;
 
 	/*
@@ -434,7 +431,7 @@ static inline __ATTR_CONST uint8_t hex_nibble(char c) {
 	return UINT8_MAX;
 }
 
-static ssize_t URIunescape(char* const out, size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
+static ptrdiff_t URIunescape(char* const out, size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
 
 	size_t i, j;
 
@@ -460,12 +457,12 @@ static ssize_t URIunescape(char* const out, size_t maxlen, const char* const in,
 	}
 	out[j] = '\0';
 
-	return (i == inlen) ? (ssize_t)j : -1;
+	return (i == inlen) ? (ptrdiff_t)j : -1;
 
 }
 
 
-static ssize_t URIescape(char* const out, const size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
+static ptrdiff_t URIescape(char* const out, const size_t maxlen, const char* const in, const size_t inlen, const bool is_query_component) {
 
 	static const char HEX[] = "0123456789ABCDEF";
 	size_t i, j;
@@ -491,7 +488,7 @@ static ssize_t URIescape(char* const out, const size_t maxlen, const char* const
 	}
 	out[j] = '\0';
 
-	return (i == inlen) ? (ssize_t)j : -1;
+	return (i == inlen) ? (ptrdiff_t)j : -1;
 
 }
 
@@ -540,7 +537,7 @@ static bool parseDLAIvaluePair(gs1_encoder* const ctx, const struct aiEntry* con
 	const bool isQueryParam = dlPathOrder == DL_PATH_ORDER_ATTRIBUTE;
 	const char* const val = ai + ailen + 1;
 	const char *outai, *outval;
-	ssize_t vallen;
+	ptrdiff_t vallen;
 	const size_t dataStrCap = MAX_DATA;	// dataStr is written from the start
 
 	DEBUG_PRINT("    Extracted AI: (%.*s)\n", (int)ailen, ai);
@@ -590,7 +587,7 @@ static bool parseDLAIvaluePair(gs1_encoder* const ctx, const struct aiEntry* con
 		}
 		// LCOV_EXCL_STOP
 		for (j = 0; j <= 13; j++)
-			v[13-j] = vallen >= (ssize_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
+			v[13-j] = vallen >= (ptrdiff_t)(j+1) ? v[(size_t)vallen-j-1] : '0';
 		v[14] = '\0';
 		vallen = 14;
 	}
@@ -634,7 +631,7 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	char* dp = NULL;	// DL path info
 	bool ret;
 	bool fnc1req = true;
-	char (*pathAIseq)[MAX_AI_LEN+1];
+	char pathAIseq[MAX_AIS][MAX_AI_LEN+1] = {{0}};
 	int numPathAIs;
 	int i;
 	size_t dataStr_len = 0;
@@ -783,8 +780,11 @@ bool gs1_parseDLuri(gs1_encoder* const ctx, char* const dlData, char* const data
 	if (qp)
 		DEBUG_PRINT("  Query params: %s\n", qp);
 
+	if (!qp)					// Skip the loop rather than test p within it
+		goto no_query_params;
+
 	p = qp;
-	while (p && *p) {
+	while (*p) {
 
 		const struct aiEntry* entry = NULL;
 		size_t ailen = 0;
@@ -833,6 +833,8 @@ add_ignored_query_param_to_ai_data:
 
 	}
 
+no_query_params:
+
 	if (fr)
 		DEBUG_PRINT("  Fragment: %s\n", fr);
 
@@ -845,8 +847,7 @@ add_ignored_query_param_to_ai_data:
 	 *  key-qualifier association
 	 *
 	 */
-	// cppcheck-suppress allocaCalled
-	pathAIseq = alloca((size_t)numPathAIs * sizeof(*pathAIseq));
+	assert(numPathAIs <= (int)SIZEOF_ARRAY(pathAIseq));
 	for (i = 0; i < numPathAIs; i++) {
 
 		const struct aiValue* ai = &ctx->aiData[i];
@@ -866,8 +867,9 @@ add_ignored_query_param_to_ai_data:
 	// instead belong within path info
 	if (numPathAIs < MAX_AIS) {
 		int k;
-		// cppcheck-suppress allocaCalled
-		char (*seq)[MAX_AI_LEN+1] = alloca((size_t)(numPathAIs + 1) * sizeof(*seq));
+		char seq[MAX_AIS + 1][MAX_AI_LEN+1] = {{0}};
+
+		assert(numPathAIs + 1 <= (int)SIZEOF_ARRAY(seq));
 
 		// Sort AIs to enable O(n) duplicate check
 		gs1_sortAIs(ctx);
@@ -968,7 +970,7 @@ static bool emitDLAIvaluePair(char** const pp, size_t* const avail, const struct
 
 	char *p = *pp;
 	const size_t lead = isQueryParam ? 0 : 1;	// Leading "/" of a path element
-	ssize_t len;
+	ptrdiff_t len;
 
 	// Need room for the punctuated AI, the escaped value and a trailing NUL or '&'
 	if (*avail < (size_t)ai->ailen + lead + 3)
@@ -1905,11 +1907,11 @@ static void do_test_URIunescape(const char* const file, const int line, const ch
 	snprintf(casename, sizeof(casename), "%s:%d: %s => %s | %s", file, line, in, expect_path, expect_query);
 	TEST_CASE(casename);
 
-	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), false) == (ssize_t)strlen(expect_path));
+	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), false) == (ptrdiff_t)strlen(expect_path));
 	TEST_CHECK(strcmp(out, expect_path) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected query component: %s", in, out, expect_path);
 
-	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), true) == (ssize_t)strlen(expect_query));
+	TEST_CHECK(URIunescape(out, sizeof(out)-1, in, strlen(in), true) == (ptrdiff_t)strlen(expect_query));
 	TEST_CHECK(strcmp(out, expect_query) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected path component: %s", in, out, expect_query);
 
@@ -1983,11 +1985,11 @@ static void do_test_URIescape(const char* const file, const int line, const char
 	snprintf(casename, sizeof(casename), "%s:%d: %s => %s | %s", file, line, in, expect_path, expect_query);
 	TEST_CASE(casename);
 
-	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), false) == (ssize_t)strlen(expect_path));
+	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), false) == (ptrdiff_t)strlen(expect_path));
 	TEST_CHECK(strcmp(out, expect_path) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected path component: %s", in, out, expect_path);
 
-	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), true) == (ssize_t)strlen(expect_query));
+	TEST_CHECK(URIescape(out, sizeof(out)-1, in, strlen(in), true) == (ptrdiff_t)strlen(expect_query));
 	TEST_CHECK(strcmp(out, expect_query) == 0);
 	TEST_MSG("Given: %s; Got: %s; Expected query component: %s", in, out, expect_query);
 
@@ -2138,6 +2140,7 @@ void test_dl_testValidateDLpathAIseq(void) {
 			n = snprintf(p, sizeof(casename) - (size_t)(p - casename), "%s ", seq[i][num]);
 			assert(n >= 0 || n < (int)(sizeof(casename) - (size_t)(p - casename)));
 		}
+		assert(num > 0);		// Every case has at least one AI
 		*(p-1) = '\0';
 		TEST_CASE(casename);
 
@@ -2409,6 +2412,8 @@ void test_dl_allocFailures(void) {
 }
 
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+
 void test_dl_keyQualifierLimit(void) {
 
 	const char* const path = "test-syndict-dlpkey.txt";
@@ -2428,6 +2433,7 @@ void test_dl_keyQualifierLimit(void) {
 		gs1_encoder_free(ctx);
 	}
 
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
 	// One qualifier over the cap is rejected (no 2^n blow-up): load falls back
 	// to the embedded table, so the custom AI is no longer known
 	fp = fopen(path, "wb");
@@ -2442,10 +2448,13 @@ void test_dl_keyQualifierLimit(void) {
 		TEST_CHECK(ctx->err == gs1_encoder_eAI_UNRECOGNISED);
 		gs1_encoder_free(ctx);
 	}
+#endif  /* EXCLUDE_EMBEDDED_AI_TABLE */
 
 	remove(path);
 
 }
+
+#endif  /* EXCLUDE_SYNTAX_DICTIONARY_LOADER */
 
 
 #endif  /* UNIT_TESTS */

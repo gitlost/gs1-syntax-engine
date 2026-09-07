@@ -244,7 +244,7 @@ void gs1_encoder_free(gs1_encoder* const ctx) {
 
 
 __ATTR_CONST char* gs1_encoder_getVersion(void) {
-	return __DATE__;
+	return GS1_ENCODERS_VERSION;
 }
 
 
@@ -810,6 +810,45 @@ bool gs1_tokenise(const char *data, char delim, gs1_tok_t *tok) {
 }
 
 
+/*
+ *  Reentrant tokeniser with strtok_r semantics, which is POSIX rather than
+ *  ISO C and therefore not available on all targets
+ *
+ */
+char* gs1_strtok_r(char *str, const char *delim, char **saveptr) {
+
+	char *tok, *p;
+
+	assert(delim);
+	assert(saveptr);
+
+	p = str ? str : *saveptr;
+	if (!p)
+		return NULL;
+
+	while (*p && strchr(delim, *p))		// Leading delimiters
+		p++;
+
+	if (!*p) {
+		*saveptr = p;
+		return NULL;
+	}
+
+	tok = p;
+
+	while (*p && !strchr(delim, *p))	// Scan to end of token
+		p++;
+
+	if (*p)
+		*p++ = '\0';
+
+	*saveptr = p;
+
+	return tok;
+
+}
+
+
 char* gs1_strdup_alloc(const char *s) {
 
 	size_t len = strlen(s) + 1;
@@ -837,7 +876,7 @@ char* gs1_strdup_alloc(const char *s) {
  *  versus "bad data" (e.g. illegal AI to vivify due to clash with known AIs).
  *
  */
-__ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const haystack, const size_t haystack_size,
+__ATTR_PURE ptrdiff_t gs1_binarySearch(const void* const needle, const void* const haystack, const size_t haystack_size,
 			 int (* const compare)(const void* const key, const void* const element, const size_t index),
 			 bool (* const validate)(const void* const key, const void* const element, const size_t index)) {
 
@@ -851,7 +890,7 @@ __ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const
 			size_t i;
 
 			if (!validate || validate(needle, haystack, m))
-				return (ssize_t)m;
+				return (ptrdiff_t)m;
 
 			/*
 			 *  The comparison matched but validation failed.
@@ -865,14 +904,14 @@ __ATTR_PURE ssize_t gs1_binarySearch(const void* const needle, const void* const
 				if (compare(needle, haystack, i - 1) != 0)
 					break;
 				else if (validate(needle, haystack, i - 1))
-					return (ssize_t)(i - 1);
+					return (ptrdiff_t)(i - 1);
 			// LCOV_EXCL_STOP
 
 			for (i = m + 1; i < haystack_size; i++)
 				if (compare(needle, haystack, i) != 0)
 					break;
 				else if (validate(needle, haystack, i))
-					return (ssize_t)i;
+					return (ptrdiff_t)i;
 
 			return GS1_SEARCH_INVALID;
 
@@ -909,7 +948,39 @@ char bigbuffer[MAX_DATA+5];
 void test_api_getVersion(void) {
 	const char *version = gs1_encoder_getVersion();
 
-	TEST_CHECK(version != NULL && strcmp(version, __DATE__) == 0);
+	TEST_CHECK(version != NULL && strcmp(version, GS1_ENCODERS_VERSION) == 0);
+}
+
+
+void test_api_strtok_r(void) {
+
+	char buf[] = "  alpha\tbeta   gamma  delta";
+	char only[] = ",,,";
+	char empty[] = "";
+	const char *tok;
+	char *saveptr = NULL;
+
+	TEST_ASSERT((tok = gs1_strtok_r(buf, " \t", &saveptr)) != NULL);
+	TEST_CHECK(strcmp(tok, "alpha") == 0);				// Leading delimiters skipped
+
+	TEST_ASSERT((tok = gs1_strtok_r(NULL, " \t", &saveptr)) != NULL);
+	TEST_CHECK(strcmp(tok, "beta") == 0);
+
+	TEST_ASSERT((tok = gs1_strtok_r(NULL, "", &saveptr)) != NULL);
+	TEST_CHECK(strcmp(tok, "  gamma  delta") == 0);			// Empty set yields the remainder
+
+	TEST_CHECK(gs1_strtok_r(NULL, " \t", &saveptr) == NULL);
+	TEST_CHECK(gs1_strtok_r(NULL, " \t", &saveptr) == NULL);	// Stays exhausted
+
+	saveptr = NULL;
+	TEST_CHECK(gs1_strtok_r(NULL, ",", &saveptr) == NULL);		// No string and no saved position
+
+	saveptr = NULL;
+	TEST_CHECK(gs1_strtok_r(only, ",", &saveptr) == NULL);		// Only delimiters
+
+	saveptr = NULL;
+	TEST_CHECK(gs1_strtok_r(empty, ",", &saveptr) == NULL);
+
 }
 
 
@@ -964,6 +1035,8 @@ DIAG_POP
  *  the deprecated enumerators have been removed; do not delete them.
  *
  */
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
+
 void test_api_init_deprecatedFlags(void) {
 
 DIAG_PUSH
@@ -1011,6 +1084,8 @@ DIAG_DISABLE_DEPRECATED_DECLARATIONS
 DIAG_POP
 
 }
+
+#endif  /* EXCLUDE_EMBEDDED_AI_TABLE */
 
 
 void test_api_init_opts_layout(void) {
@@ -1344,6 +1419,7 @@ void test_api_getters(void) {
 	 *  gs1_encoder_init_ex with opts
 	 *
 	 */
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
 	{
 		gs1_encoder *ctx2;
 		gs1_encoder_init_status_t status;
@@ -1390,6 +1466,7 @@ void test_api_getters(void) {
 			gs1_encoder_free(ctx2);
 		}
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 		/* syntaxDictionary: nonexistent file, must fail without fallback */
 		opts.flags = gs1_encoder_iDEFAULT;
 		opts.syntaxDictionary = "nonexistent-file.txt";
@@ -1406,6 +1483,7 @@ void test_api_getters(void) {
 		TEST_CHECK(status == GS1_ENCODERS_INIT_FALLBACK_TO_EMBEDDED_TABLE);
 		TEST_CHECK(msgBuf[0] != '\0');		// errMsg surfaced via msgBuf
 		gs1_encoder_free(ctx2);
+#endif
 
 		/* iFALLBACK_ON_SYNDICT_ERROR + iNO_EMBEDDED + bad path: fallback target is
 		   disabled, so init must fail with NO_EMBEDDED_TABLE rather than fall back */
@@ -1429,7 +1507,9 @@ void test_api_getters(void) {
 		gs1_encoder_free(ctx2);
 		opts.struct_size = sizeof(gs1_encoder_init_opts_t);
 	}
+#endif  /* EXCLUDE_EMBEDDED_AI_TABLE */
 
+#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
 	/*
 	 *  msgBuf truncation: when msgBufSize is smaller than the error
 	 *  string, the buffer must still be NUL-terminated and not overrun.
@@ -1472,6 +1552,7 @@ void test_api_getters(void) {
 		ctx2 = gs1_encoder_init_ex(NULL, &opts);
 		TEST_CHECK(ctx2 == NULL);
 	}
+#endif
 
 	/*
 	 *  gs1_encoder_setValidationEnabled: invalid enum
@@ -2233,6 +2314,8 @@ void test_api_allocFailures(void) {
 }
 
 
+#if !defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER) && !defined(EXCLUDE_EMBEDDED_AI_TABLE)
+
 void test_api_brokenPrefixSyndict(void) {
 
 	const char* const path = "test-syndict-broken-prefix.txt";
@@ -2302,6 +2385,8 @@ void test_api_tooManyDLkeyQualifiersSyndict(void) {
 	remove(path);
 
 }
+
+#endif  /* Syntax Dictionary fallback to the embedded AI table */
 
 
 #endif  /* UNIT_TESTS */

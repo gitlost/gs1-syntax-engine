@@ -23,28 +23,21 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "gs1encoders.h"
 
 
+#if defined(EXCLUDE_EMBEDDED_AI_TABLE) && defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER)
+#error "EXCLUDE_EMBEDDED_AI_TABLE and EXCLUDE_SYNTAX_DICTIONARY_LOADER are mutually exclusive: the AI table would have no source"
+#endif
+
+
 // Implementation limits that can be changed
 #define MAX_DATA	8191	// Maximum input buffer size
 
-
-#ifdef _MSC_VER
-#include <malloc.h>
-#define strtok_r strtok_s
-#define ssize_t ptrdiff_t
-#define alloca _alloca
-#else
-#  include <sys/types.h>			// IWYU pragma: export
-#  if (defined(__GNUC__) && !defined(alloca) && !defined(__NetBSD__)) || defined(__NuttX__) || defined(_AIX) \
-        || (defined(__sun) && defined(__SVR4) /*Solaris*/)
-#    include <alloca.h>				// IWYU pragma: export
-#  endif
-#endif
 
 #if defined(__GNUC__) || defined(__clang__)
 #define __ATTR_CONST __attribute__ ((__const__))
@@ -399,9 +392,11 @@ typedef struct {
 
 bool gs1_tokenise(const char *data, char delim, gs1_tok_t *tok);
 
+char* gs1_strtok_r(char *str, const char *delim, char **saveptr);
+
 char* gs1_strdup_alloc(const char *s);
 
-ssize_t gs1_binarySearch(const void* needle, const void* haystack, const size_t haystack_size,
+ptrdiff_t gs1_binarySearch(const void* needle, const void* haystack, const size_t haystack_size,
 			 int (*compare)(const void* key, const void* element, const size_t index),
 			 bool (*validate)(const void* key, const void* element, const size_t index));
 
@@ -409,9 +404,12 @@ ssize_t gs1_binarySearch(const void* needle, const void* haystack, const size_t 
 #ifdef UNIT_TESTS
 
 void test_api_getVersion(void);
+void test_api_strtok_r(void);
 void test_api_instanceSize(void);
 void test_api_init(void);
+#ifndef EXCLUDE_EMBEDDED_AI_TABLE
 void test_api_init_deprecatedFlags(void);
+#endif
 void test_api_init_opts_layout(void);
 void test_api_init_enum_values(void);
 void test_api_defaults(void);
@@ -431,7 +429,7 @@ void test_api_copyHRI(void);
 void test_api_getDLignoredQueryParams(void);
 void test_api_copyDLignoredQueryParams(void);
 void test_api_allocFailures(void);
-#ifndef EXCLUDE_SYNTAX_DICTIONARY_LOADER
+#if !defined(EXCLUDE_SYNTAX_DICTIONARY_LOADER) && !defined(EXCLUDE_EMBEDDED_AI_TABLE)
 void test_api_brokenPrefixSyndict(void);
 void test_api_tooManyDLkeyQualifiersSyndict(void);
 #endif

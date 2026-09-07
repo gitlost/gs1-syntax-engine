@@ -211,6 +211,60 @@ jobs:
             SLOW_TESTS=yes test
           echo '::endgroup::'
 
+  ci-fuzzer:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Fuzzer CI
+        run: |
+
+          # For llvm-symbolizer and lld
+          sudo apt-get -y --no-install-recommends install llvm lld
+
+          echo '::group::Build fuzzers and seed their corpora (clang+ASAN+LSAN+UBSAN+libFuzzer)'
+          make -C src/c-lib -j "$(nproc)" fuzzer
+          echo '::endgroup::'
+
+  ci-build-options:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Compile-time configuration macros
+        run: |
+
+          echo '::group::C tests with the Syntax Dictionary loader excluded'
+          make -C src/c-lib -j "$(nproc)" test \
+            EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER
+          echo '::endgroup::'
+
+          echo '::group::C tests with the embedded AI table excluded'
+          GS1_TEST_SYNDICT=$(pwd)/src/c-lib/gs1-syntax-dictionary.txt \
+            make -C src/c-lib -j "$(nproc)" test \
+              EXTRA_CFLAGS=-DEXCLUDE_EMBEDDED_AI_TABLE
+          echo '::endgroup::'
+
+          echo '::group::Excluding both AI table sources is rejected'
+          if make -C src/c-lib lib \
+               EXTRA_CFLAGS='-DEXCLUDE_EMBEDDED_AI_TABLE -DEXCLUDE_SYNTAX_DICTIONARY_LOADER' \
+               > both-excluded.log 2>&1; then
+            echo 'Build unexpectedly succeeded with no source of AI definitions'
+            exit 1
+          fi
+          grep -q 'mutually exclusive' both-excluded.log
+          echo '::endgroup::'
+
   ci-msvc:
 
     runs-on: windows-latest

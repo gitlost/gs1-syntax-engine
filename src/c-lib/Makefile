@@ -28,6 +28,7 @@ PATCH = $(word 3,$(subst ., ,$(VERSION)))
 NAME = gs1encoders
 
 BUILD_DIR = build
+ALL_BUILD_DIRS = build build-test build-fuzzer build-msan build-coverage build-wasm
 
 
 ARCH := $(shell $(CC) -dumpmachine)
@@ -76,26 +77,6 @@ else
 CFLAGS_G = -g
 CFLAGS_O = -O2
 CFLAGS_V = -fvisibility=hidden
-endif
-
-ifeq ($(MAKECMDGOALS),clean-test)
-BUILD_DIR = build-test
-endif
-
-ifeq ($(MAKECMDGOALS),clean-fuzzer)
-BUILD_DIR = build-fuzzer
-endif
-
-ifeq ($(MAKECMDGOALS),clean-msan)
-BUILD_DIR = build-msan
-endif
-
-ifeq ($(MAKECMDGOALS),clean-coverage)
-BUILD_DIR = build-coverage
-endif
-
-ifeq ($(MAKECMDGOALS),clean-wasm)
-BUILD_DIR = build-wasm
 endif
 
 ifneq ($(filter fuzzer fuzzer-% fuzzer-corpus-seeds,$(MAKECMDGOALS)),)
@@ -193,7 +174,13 @@ CFLAGS_FORTIFY = -D_FORTIFY_SOURCE=2
 NPROC = nproc
 endif
 
-CFLAGS = $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_FORTIFY) $(CFLAGS_V) -Wall -Wextra -Wconversion -Wformat=2 -Wshadow -Wdeclaration-after-statement -pedantic -Wundef -Wnull-dereference -Wstrict-prototypes -Werror -fstack-protector-strong -MMD -fPIC -DGS1_LINTER_ERR_STR_EN $(SAN_CFLAGS) $(COV_CFLAGS) $(ANALYZER_CFLAGS) $(UNIT_TEST_CFLAGS) $(DEBUG_CFLAGS) $(SLOW_TESTS_CFLAGS)
+# Additional compiler flags, e.g. for the compile-time configuration macros.
+#
+#   make EXTRA_CFLAGS=-DEXCLUDE_SYNTAX_DICTIONARY_LOADER lib
+#
+EXTRA_CFLAGS =
+
+CFLAGS = -std=c99 $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_FORTIFY) $(CFLAGS_V) -Wall -Wextra -Wconversion -Wformat=2 -Wshadow -Wdeclaration-after-statement -pedantic -Wundef -Wnull-dereference -Wstrict-prototypes -Werror -fstack-protector-strong -MMD -fPIC -DGS1_LINTER_ERR_STR_EN $(SAN_CFLAGS) $(COV_CFLAGS) $(ANALYZER_CFLAGS) $(UNIT_TEST_CFLAGS) $(DEBUG_CFLAGS) $(SLOW_TESTS_CFLAGS) $(EXTRA_CFLAGS)
 
 TEST_BIN = $(BUILD_DIR)/$(NAME)-test.$(BIN_SUFFIX)
 
@@ -207,6 +194,15 @@ endif
 
 PREFIX = /usr/local
 LIBDIR = $(PREFIX)/lib
+
+# ldconfig refreshes the shared library cache of the running system, which is
+# meaningless for a staged install and unavailable other than on Linux
+LDCONFIG = :
+ifeq ($(ARCH_OS), linux)
+ifeq ($(DESTDIR),)
+LDCONFIG = ldconfig
+endif
+endif
 
 EXAMPLE_SRC = example.c
 EXAMPLE_BIN = $(BUILD_DIR)/$(NAME)-example.$(BIN_SUFFIX)
@@ -252,16 +248,40 @@ DEPS = $(addprefix $(BUILD_DIR)/, $(ALL_SRCS:.c=.d)) $(FUZZER_OBJS:.o=.d)
 #
 #  General goals
 #
+
+#
+#  Objects are invalidated whenever the toolchain or the compiler flags
+#  change, since goals such as SANITIZE=yes share a build directory with
+#  plain builds yet produce objects that cannot be linked together
+#
+BUILD_FLAGS = $(CC) $(CFLAGS)
+BUILD_FLAGS_STAMP = $(BUILD_DIR)/.build-flags
+
+#
+#  Coverage deliberately builds one directory twice under differing flags so
+#  that the gcov counters of both runs accumulate; recompiling in between
+#  would discard the counters of the first
+#
+ifneq ($(COVERAGE),yes)
+BUILD_FLAGS_DEP = $(BUILD_FLAGS_STAMP)
+endif
+
+.PHONY: FORCE
+FORCE:
+
+$(BUILD_FLAGS_STAMP): FORCE | $(BUILD_DIR)/
+	@echo '$(BUILD_FLAGS)' | cmp -s - $@ || echo '$(BUILD_FLAGS)' > $@
+
 $(BUILD_DIR)/syntax/:
 	mkdir -p $@
 
-$(BUILD_DIR)/syntax/%.o: syntax/%.c | $(BUILD_DIR)/syntax/
+$(BUILD_DIR)/syntax/%.o: syntax/%.c $(BUILD_FLAGS_DEP) | $(BUILD_DIR)/syntax/
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/:
 	mkdir -p $@
 
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)/
+$(BUILD_DIR)/%.o: %.c $(BUILD_FLAGS_DEP) | $(BUILD_DIR)/
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
@@ -285,6 +305,17 @@ $(BUILD_DIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_SO) $(LDLIBS) $^ -o $@
 
 endif
+
+
+#
+#  pkg-config metadata, regenerated so that it always reflects PREFIX,
+#  LIBDIR and the version currently being built
+#
+$(BUILD_DIR)/$(NAME).pc: $(NAME).pc.in FORCE | $(BUILD_DIR)/
+	sed -e 's|@PREFIX@|$(PREFIX)|g' \
+	    -e 's|@LIBDIR@|$(LIBDIR)|g' \
+	    -e 's|@VERSION@|$(VERSION)|g' \
+	    $< > $@
 
 
 #
@@ -529,20 +560,20 @@ fuzzer: $(FUZZER_BINS) | $(FUZZER_CORPUSES) fuzzer-corpus-seeds
 
 .PHONY: clean
 clean:
-	$(RM) -r build build-test build-fuzzer build-msan build-coverage build-wasm
+	$(RM) -r $(ALL_BUILD_DIRS)
 	$(RM) $(WASM_DIST_FILES) *.gcov
 
 .PHONY: clean-test
 clean-test:
-	$(RM) $(OBJS) $(EXAMPLE_BIN) $(APP_CPP_BIN) $(APP_CPP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(LINTER_TEST_BIN) $(LINTER_TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build-test
 
 .PHONY: clean-fuzzer
 clean-fuzzer:
-	$(RM) $(OBJS) $(EXAMPLE_BIN) $(APP_CPP_BIN) $(APP_CPP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(LINTER_TEST_BIN) $(LINTER_TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build-fuzzer
 
 .PHONY: clean-msan
 clean-msan:
-	$(RM) $(OBJS) $(EXAMPLE_BIN) $(APP_CPP_BIN) $(APP_CPP_STATIC) $(TEST_BIN) $(TEST_OBJ) $(LINTER_TEST_BIN) $(LINTER_TEST_OBJ) $(FUZZER_BINS) $(FUZZER_OBJS) $(LIB_STATIC) $(LIB_SHARED) $(DEPS)
+	$(RM) -r build-msan
 
 .PHONY: clean-coverage
 clean-coverage:
@@ -554,36 +585,46 @@ clean-fuzzer-corpus:
 
 .PHONY: clean-wasm
 clean-wasm:
-	$(RM) $(OBJS) $(WASM_JS) $(WASM_WASM) $(WASM_DIST_FILES) $(DEPS)
+	$(RM) -r build-wasm
+	$(RM) $(WASM_DIST_FILES)
 
 .PHONY: install
 install: install-static install-shared
 
-.PHONY: .install-headers
+.PHONY: install-headers
 install-headers:
 	install -d $(DESTDIR)$(PREFIX)/include
 	install -m 0644 $(NAME).h   $(DESTDIR)$(PREFIX)/include
 	install -m 0644 $(NAME).hpp $(DESTDIR)$(PREFIX)/include
 
+.PHONY: install-pkgconfig
+install-pkgconfig: $(BUILD_DIR)/$(NAME).pc
+	install -d $(DESTDIR)$(LIBDIR)/pkgconfig
+	install -m 0644 $(BUILD_DIR)/$(NAME).pc $(DESTDIR)$(LIBDIR)/pkgconfig
+
 .PHONY: install-static
-install-static: libstatic install-headers
+install-static: libstatic install-headers install-pkgconfig
 	install -d $(DESTDIR)$(LIBDIR)
 	install -m 0644 $(BUILD_DIR)/lib$(NAME).$(LIB_STATIC_SUFFIX) $(DESTDIR)$(LIBDIR)
 
 .PHONY: install-shared
-install-shared: libshared install-headers
+install-shared: libshared install-headers install-pkgconfig
 	install -d $(DESTDIR)$(LIBDIR)
 	install -m 0644 $(BUILD_DIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)
-	-ldconfig
+	ln -sf lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(MAJOR)
+	ln -sf lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX)
+	-$(LDCONFIG)
 
 .PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/include/$(NAME).h
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION)
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX).$(MAJOR)
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_DYN_SUFFIX)
-	$(RM) $(DESTDIR)$(PREFIX)/lib/lib$(NAME).$(LIB_STATIC_SUFFIX)
-	-ldconfig
+	$(RM) $(DESTDIR)$(PREFIX)/include/$(NAME).hpp
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(VERSION)
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX).$(MAJOR)
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_DYN_SUFFIX)
+	$(RM) $(DESTDIR)$(LIBDIR)/lib$(NAME).$(LIB_STATIC_SUFFIX)
+	$(RM) $(DESTDIR)$(LIBDIR)/pkgconfig/$(NAME).pc
+	-$(LDCONFIG)
 
 .PHONY: docs-clib
 docs-clib:
@@ -634,6 +675,13 @@ copyright:
 
 .PHONY: setversion
 setversion:
+	sed -i -E \
+	    -e 's|^#define GS1_ENCODERS_VERSION_MAJOR[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_MAJOR\t$(MAJOR)|' \
+	    -e 's|^#define GS1_ENCODERS_VERSION_MINOR[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_MINOR\t$(MINOR)|' \
+	    -e 's|^#define GS1_ENCODERS_VERSION_PATCH[[:space:]]+[[:digit:]]+|#define GS1_ENCODERS_VERSION_PATCH\t$(PATCH)|' \
+	    -e 's|^#define GS1_ENCODERS_VERSION[[:space:]]+"[^"]*"|#define GS1_ENCODERS_VERSION\t\t"$(VERSION)"|' \
+	    $(NAME).h
+	sed -i -E 's|<Version>[^<]*</Version>|<Version>$(VERSION)</Version>|' ../dotnet-lib/gs1encoders-dotnet-lib.csproj ../dotnet-app/gs1encoders-dotnet-app.csproj
 	(cd ../js-wasm && npm version --allow-same-version $(VERSION))
 	sed -i 's/name="Implementation-Version" value="[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+"/name="Implementation-Version" value="$(VERSION)"/' ../java/build.xml
 

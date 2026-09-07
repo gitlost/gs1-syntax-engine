@@ -36,7 +36,8 @@ namespace {
 
 namespace enc = gs1encoders;
 
-constexpr std::string_view RELEASE = __DATE__;
+constexpr std::string_view RELEASE = GS1_ENCODERS_VERSION;
+constexpr std::string_view BUILD_DATE = __DATE__;
 
 
 /* ------------------------------------------------------------------
@@ -261,7 +262,7 @@ int main(int argc, char *argv[]) {
 			return EXIT_SUCCESS;
 		}
 
-		std::cout << "\nGS1 Barcode Syntax Engine Console Demo (Built " << RELEASE << "):";
+		std::cout << "\nGS1 Barcode Syntax Engine Console Demo (Built " << BUILD_DATE << "):";
 		std::cout << "\n\nCopyright (c) 2020-2026 GS1 AISBL. License: Apache-2.0";
 
 		userInt(gs);
